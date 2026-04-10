@@ -1,0 +1,4 @@
+node_modules
+.env
+backend/.git.backup
+frontend/.git.backup
