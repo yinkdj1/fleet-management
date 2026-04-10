@@ -25,6 +25,25 @@ function roundToTwo(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+function normalizeEmail(value) {
+  if (!value) return null;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized || null;
+}
+
+function normalizePhone(value) {
+  if (!value) return null;
+  const normalized = String(value).trim();
+  return normalized || null;
+}
+
+function getMinimumAllowedDateOfBirth(today = new Date()) {
+  const date = new Date(today);
+  date.setFullYear(date.getFullYear() - 18);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 function getVehicleDailyRate(vehicle) {
   const parsedRate = Number(vehicle?.dailyRate);
 
@@ -312,6 +331,22 @@ function validatePublicReservationPayload(data = {}) {
     errors.contact = "Either email or phone is required";
   }
 
+  if (!customer.addressLine || !String(customer.addressLine).trim()) {
+    errors.addressLine = "Address is required";
+  }
+
+  if (!customer.city || !String(customer.city).trim()) {
+    errors.city = "City is required";
+  }
+
+  if (!customer.state || !String(customer.state).trim()) {
+    errors.state = "State is required";
+  }
+
+  if (!customer.zip || !String(customer.zip).trim()) {
+    errors.zip = "Zip is required";
+  }
+
   if (!customer.driversLicenseNo || !String(customer.driversLicenseNo).trim()) {
     errors.driversLicenseNo = "Driver's license number is required";
   }
@@ -322,6 +357,8 @@ function validatePublicReservationPayload(data = {}) {
     const dob = new Date(customer.dateOfBirth);
     if (Number.isNaN(dob.getTime())) {
       errors.dateOfBirth = "Date of birth is invalid";
+    } else if (dob > getMinimumAllowedDateOfBirth()) {
+      errors.dateOfBirth = "Customer must be at least 18 years old";
     }
   }
 
@@ -365,8 +402,15 @@ function validatePublicReservationPayload(data = {}) {
 async function findOrCreatePublicCustomer(customerData) {
   const firstName = String(customerData.firstName || "").trim();
   const lastName = String(customerData.lastName || "").trim();
-  const email = customerData.email ? String(customerData.email).trim().toLowerCase() : null;
-  const phone = customerData.phone ? String(customerData.phone).trim() : null;
+  const email = normalizeEmail(customerData.email);
+  const phone = normalizePhone(customerData.phone);
+  const addressLine = customerData.addressLine
+    ? String(customerData.addressLine).trim()
+    : null;
+  const city = customerData.city ? String(customerData.city).trim() : null;
+  const state = customerData.state ? String(customerData.state).trim() : null;
+  const zip = customerData.zip ? String(customerData.zip).trim() : null;
+  const address = [addressLine, city, state, zip].filter(Boolean).join(", ") || null;
   const driversLicenseNo = customerData.driversLicenseNo
     ? String(customerData.driversLicenseNo).trim()
     : null;
@@ -386,8 +430,37 @@ async function findOrCreatePublicCustomer(customerData) {
           firstName: firstName || existingByEmail.firstName,
           lastName: lastName || existingByEmail.lastName,
           phone: phone || existingByEmail.phone,
+          address: address || existingByEmail.address,
+          addressLine: addressLine || existingByEmail.addressLine,
+          city: city || existingByEmail.city,
+          state: state || existingByEmail.state,
+          zip: zip || existingByEmail.zip,
           driversLicenseNo: driversLicenseNo || existingByEmail.driversLicenseNo,
           dateOfBirth: dateOfBirth || existingByEmail.dateOfBirth,
+        },
+      });
+    }
+  }
+
+  if (phone) {
+    const existingByPhone = await prisma.customer.findFirst({
+      where: { phone },
+    });
+
+    if (existingByPhone) {
+      return prisma.customer.update({
+        where: { id: existingByPhone.id },
+        data: {
+          firstName: firstName || existingByPhone.firstName,
+          lastName: lastName || existingByPhone.lastName,
+          email: email || existingByPhone.email,
+          address: address || existingByPhone.address,
+          addressLine: addressLine || existingByPhone.addressLine,
+          city: city || existingByPhone.city,
+          state: state || existingByPhone.state,
+          zip: zip || existingByPhone.zip,
+          driversLicenseNo: driversLicenseNo || existingByPhone.driversLicenseNo,
+          dateOfBirth: dateOfBirth || existingByPhone.dateOfBirth,
         },
       });
     }
@@ -400,6 +473,11 @@ async function findOrCreatePublicCustomer(customerData) {
         lastName,
         email,
         phone,
+        address,
+        addressLine,
+        city,
+        state,
+        zip,
         driversLicenseNo,
         dateOfBirth,
       },
@@ -431,6 +509,42 @@ async function createPublicReservation(data) {
     status: "reserved",
     paymentStatus: "paid",
   });
+}
+
+async function findPublicCustomerByContact(contact = {}) {
+  const email = normalizeEmail(contact.email);
+  const phone = normalizePhone(contact.phone);
+
+  if (!email && !phone) {
+    throw buildAppError("Email or phone is required", 400, {
+      contact: "Provide an email or phone",
+    });
+  }
+
+  const customer = await prisma.customer.findFirst({
+    where: {
+      OR: [
+        email ? { email } : null,
+        phone ? { phone } : null,
+      ].filter(Boolean),
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      address: true,
+      addressLine: true,
+      city: true,
+      state: true,
+      zip: true,
+      driversLicenseNo: true,
+      dateOfBirth: true,
+    },
+  });
+
+  return customer;
 }
 
 async function updateBooking(id, data) {
@@ -712,6 +826,7 @@ module.exports = {
   getBookingById,
   createBooking,
   createPublicReservation,
+  findPublicCustomerByContact,
   updateBooking,
   rescheduleBooking,
   changeBookingStatus,

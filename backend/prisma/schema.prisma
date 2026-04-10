@@ -41,6 +41,11 @@ model Customer {
   lastName         String
   email            String?   @unique
   phone            String?
+  address          String?
+  addressLine      String?
+  city             String?
+  state            String?
+  zip              String?
   driversLicenseNo String?
   dateOfBirth      DateTime?
   licenseExpiry    DateTime?

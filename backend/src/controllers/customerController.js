@@ -61,7 +61,20 @@ async function getCustomerById(req, res, next) {
 
 async function createCustomer(req, res, next) {
   try {
-    const { firstName, lastName, email, phone, driversLicenseNo, dateOfBirth, licenseExpiry } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      address,
+      addressLine,
+      city,
+      state,
+      zip,
+      driversLicenseNo,
+      dateOfBirth,
+      licenseExpiry,
+    } = req.body;
 
     if (!firstName || !lastName) {
       const error = new Error("First name and last name are required");
@@ -75,6 +88,11 @@ async function createCustomer(req, res, next) {
         lastName,
         email: email || null,
         phone: phone || null,
+        address: address ? String(address).trim() : null,
+        addressLine: addressLine ? String(addressLine).trim() : null,
+        city: city ? String(city).trim() : null,
+        state: state ? String(state).trim() : null,
+        zip: zip ? String(zip).trim() : null,
         driversLicenseNo: driversLicenseNo || null,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : null,
@@ -93,7 +111,20 @@ async function createCustomer(req, res, next) {
 
 async function updateCustomer(req, res, next) {
   try {
-    const { firstName, lastName, email, phone, driversLicenseNo, dateOfBirth, licenseExpiry } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      address,
+      addressLine,
+      city,
+      state,
+      zip,
+      driversLicenseNo,
+      dateOfBirth,
+      licenseExpiry,
+    } = req.body;
 
     const customer = await prisma.customer.update({
       where: { id: Number(req.params.id) },
@@ -102,6 +133,11 @@ async function updateCustomer(req, res, next) {
         lastName,
         email: email || null,
         phone: phone || null,
+        address: address ? String(address).trim() : null,
+        addressLine: addressLine ? String(addressLine).trim() : null,
+        city: city ? String(city).trim() : null,
+        state: state ? String(state).trim() : null,
+        zip: zip ? String(zip).trim() : null,
         driversLicenseNo: driversLicenseNo || null,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : null,

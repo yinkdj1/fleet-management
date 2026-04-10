@@ -16,6 +16,7 @@ export default function NewVehiclePage() {
     plateNumber: "",
     status: "available",
     dailyRate: "",
+    imageUrl: "",
   });
 
   const [error, setError] = useState("");
@@ -26,6 +27,11 @@ export default function NewVehiclePage() {
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
+
+    if (!form.imageUrl.trim()) {
+      setError("Vehicle image URL is required");
+      return;
+    }
 
     try {
       await api.post("/vehicles", {
@@ -82,6 +88,13 @@ export default function NewVehiclePage() {
     placeholder="Daily Rate"
     onChange={handleChange}
     className="w-full p-3 border rounded"
+  />
+  <input
+    name="imageUrl"
+    placeholder="Vehicle Image URL"
+    onChange={handleChange}
+    className="w-full p-3 border rounded"
+    required
   />
 
   <button className="bg-black text-white px-4 py-2 rounded">

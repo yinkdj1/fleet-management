@@ -2,6 +2,9 @@ const express = require("express");
 
 const {
   getPublicAvailableVehicles,
+  getPublicCustomerByContact,
+  getPublicGeocodeSearch,
+  getPublicGeocodeReverse,
   createTestPayment,
   createPublicReservation,
 } = require("../controllers/publicController");
@@ -31,6 +34,9 @@ const paymentRateLimiter = createRateLimiter({
 });
 
 router.get("/vehicles/available", vehiclesRateLimiter, getPublicAvailableVehicles);
+router.get("/customers/lookup", vehiclesRateLimiter, getPublicCustomerByContact);
+router.get("/geocode/search", vehiclesRateLimiter, getPublicGeocodeSearch);
+router.get("/geocode/reverse", vehiclesRateLimiter, getPublicGeocodeReverse);
 router.post(
   "/payments/test-charge",
   paymentRateLimiter,
