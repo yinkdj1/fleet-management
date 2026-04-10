@@ -794,9 +794,12 @@ export default function ReservePage() {
       });
 
       const bookingId = res.data?.data?.id;
+      const confirmationEmailMessage = res.data?.data?.confirmationEmail?.message;
       setSuccess(
         bookingId
-          ? `Reservation submitted. Your booking ID is #${bookingId}.`
+          ? `Reservation submitted. Your booking ID is #${bookingId}.${
+              confirmationEmailMessage ? ` ${confirmationEmailMessage}` : ""
+            }`
           : "Reservation submitted successfully."
       );
 

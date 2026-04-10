@@ -1,6 +1,7 @@
 // src/services/bookingService.js
 
 const prisma = require("../config/db");
+const jwt = require("jsonwebtoken");
 
 const {
   validateCreateBooking,
@@ -13,12 +14,41 @@ const {
   syncVehicleStatusOnBookingStatusChange,
   reevaluateVehicleStatus,
 } = require("./vehicleStatusService");
+const { hasSmtpConfig, sendEmail } = require("./emailService");
 
 function buildAppError(message, statusCode = 400, errors = null) {
   const error = new Error(message);
   error.statusCode = statusCode;
   if (errors) error.errors = errors;
   return error;
+}
+
+function getJwtSecret() {
+  if (!process.env.JWT_SECRET) {
+    throw buildAppError("JWT secret is not configured", 500);
+  }
+  return process.env.JWT_SECRET;
+}
+
+function getFrontendBaseUrl() {
+  return (process.env.FRONTEND_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
+}
+
+function formatDateTimeForEmail(value) {
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return String(value || "");
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function roundToTwo(value) {
@@ -35,6 +65,11 @@ function normalizePhone(value) {
   if (!value) return null;
   const normalized = String(value).trim();
   return normalized || null;
+}
+
+function normalizeName(value) {
+  if (!value) return "";
+  return String(value).trim().toLowerCase();
 }
 
 function getMinimumAllowedDateOfBirth(today = new Date()) {
@@ -496,12 +531,251 @@ async function findOrCreatePublicCustomer(customerData) {
   }
 }
 
+function createGuestManageTokenFromBooking(booking, expiresIn = "7d") {
+  const email = normalizeEmail(booking?.customer?.email);
+  const lastName = normalizeName(booking?.customer?.lastName);
+
+  if (!email || !lastName) {
+    throw buildAppError("Guest must have email and last name to receive booking management links", 400, {
+      contact: "Customer email and last name are required",
+    });
+  }
+
+  return jwt.sign(
+    {
+      type: "booking_manage",
+      bookingId: booking.id,
+      email,
+      lastName,
+    },
+    getJwtSecret(),
+    { expiresIn }
+  );
+}
+
+function buildGuestManageLinks(booking) {
+  const token = createGuestManageTokenFromBooking(booking);
+  const baseUrl = getFrontendBaseUrl();
+  const manageBase = `${baseUrl}/guest-manage/${token}`;
+
+  return {
+    token,
+    manageUrl: manageBase,
+    modifyUrl: `${manageBase}?action=modify`,
+    cancelUrl: `${manageBase}?action=cancel`,
+  };
+}
+
+async function sendReservationConfirmationEmail(booking) {
+  const email = normalizeEmail(booking?.customer?.email);
+  if (!email) {
+    return {
+      sent: false,
+      reason: "guest_email_missing",
+      message: "Reservation created, but guest email is missing.",
+      links: null,
+    };
+  }
+
+  const links = buildGuestManageLinks(booking);
+
+  const guestFirstName = escapeHtml(booking.customer?.firstName || "Guest");
+  const vehicleLabel = escapeHtml(
+    `${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""}`.trim()
+  );
+  const plateNumber = escapeHtml(booking.vehicle?.plateNumber || "N/A");
+  const pickupDisplay = escapeHtml(formatDateTimeForEmail(booking.pickupDatetime));
+  const returnDisplay = escapeHtml(formatDateTimeForEmail(booking.returnDatetime));
+  const totalDisplay = Number(booking.totalAmount || 0).toFixed(2);
+
+  const subject = `Booking confirmation #${booking.id}`;
+  const html = `
+    <div style="margin:0;padding:24px;background:#f5f7fb;font-family:Segoe UI,Arial,sans-serif;color:#1f2937;">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+        <tr>
+          <td style="padding:20px 24px;background:linear-gradient(120deg,#0f172a,#1e293b);color:#ffffff;">
+            <p style="margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">Carsgidi</p>
+            <h1 style="margin:6px 0 0;font-size:24px;line-height:1.2;">Booking Confirmed</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px;">
+            <p style="margin:0 0 12px;font-size:15px;">Hello ${guestFirstName},</p>
+            <p style="margin:0 0 20px;font-size:15px;">Your reservation is confirmed. Here are your booking details:</p>
+
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;width:38%;">Booking ID</td><td style="padding:10px 12px;">#${booking.id}</td></tr>
+              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Vehicle</td><td style="padding:10px 12px;">${vehicleLabel} (${plateNumber})</td></tr>
+              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Pickup</td><td style="padding:10px 12px;">${pickupDisplay}</td></tr>
+              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Return</td><td style="padding:10px 12px;">${returnDisplay}</td></tr>
+              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Total</td><td style="padding:10px 12px;">$${totalDisplay}</td></tr>
+            </table>
+
+            <p style="margin:20px 0 12px;font-size:15px;">Need to make changes?</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 10px;">
+              <tr>
+                <td style="padding-right:6px;">
+                  <a href="${links.modifyUrl}" style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;padding:11px 16px;border-radius:8px;font-weight:600;font-size:14px;">Modify Reservation</a>
+                </td>
+                <td style="padding-left:6px;">
+                  <a href="${links.cancelUrl}" style="display:inline-block;background:#b91c1c;color:#ffffff;text-decoration:none;padding:11px 16px;border-radius:8px;font-weight:600;font-size:14px;">Cancel Reservation</a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:14px 0 0;font-size:12px;color:#6b7280;">If the buttons above do not work, copy and paste these links into your browser:</p>
+            <p style="margin:6px 0 0;font-size:12px;word-break:break-all;">Modify: ${escapeHtml(links.modifyUrl)}</p>
+            <p style="margin:4px 0 0;font-size:12px;word-break:break-all;">Cancel: ${escapeHtml(links.cancelUrl)}</p>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  const text = [
+    `Hello ${booking.customer?.firstName || "Guest"},`,
+    "",
+    "Your reservation is confirmed.",
+    `Booking ID: #${booking.id}`,
+    `Vehicle: ${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""} (${booking.vehicle?.plateNumber || "N/A"})`,
+    `Pickup: ${formatDateTimeForEmail(booking.pickupDatetime)}`,
+    `Return: ${formatDateTimeForEmail(booking.returnDatetime)}`,
+    `Total: $${totalDisplay}`,
+    "",
+    `Modify Reservation: ${links.modifyUrl}`,
+    `Cancel Reservation: ${links.cancelUrl}`,
+  ].join("\n");
+
+  if (!hasSmtpConfig()) {
+    return {
+      sent: false,
+      reason: "smtp_not_configured",
+      message: "Reservation created and confirmation links generated, but SMTP is not configured.",
+      links,
+    };
+  }
+
+  try {
+    const result = await sendEmail({
+      to: email,
+      subject,
+      html,
+      text,
+    });
+
+    return {
+      sent: result.sent,
+      reason: result.reason,
+      message: result.sent
+        ? "Booking confirmation email sent."
+        : "Reservation created, but confirmation email failed.",
+      links,
+    };
+  } catch {
+    return {
+      sent: false,
+      reason: "smtp_error",
+      message: "Reservation created, but confirmation email failed.",
+      links,
+    };
+  }
+}
+
+async function sendReservationCancellationEmail(booking) {
+  const email = normalizeEmail(booking?.customer?.email);
+
+  if (!email) {
+    return {
+      sent: false,
+      reason: "guest_email_missing",
+      message: "Booking cancelled, but guest email is missing.",
+    };
+  }
+
+  const guestFirstName = escapeHtml(booking.customer?.firstName || "Guest");
+  const vehicleLabel = escapeHtml(
+    `${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""}`.trim()
+  );
+  const plateNumber = escapeHtml(booking.vehicle?.plateNumber || "N/A");
+  const pickupDisplay = escapeHtml(formatDateTimeForEmail(booking.pickupDatetime));
+  const returnDisplay = escapeHtml(formatDateTimeForEmail(booking.returnDatetime));
+
+  const subject = `Booking cancelled #${booking.id}`;
+  const html = `
+    <div style="margin:0;padding:24px;background:#f5f7fb;font-family:Segoe UI,Arial,sans-serif;color:#1f2937;">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+        <tr>
+          <td style="padding:20px 24px;background:linear-gradient(120deg,#7f1d1d,#991b1b);color:#ffffff;">
+            <p style="margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">Carsgidi</p>
+            <h1 style="margin:6px 0 0;font-size:24px;line-height:1.2;">Booking Cancelled</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px;">
+            <p style="margin:0 0 12px;font-size:15px;">Hello ${guestFirstName},</p>
+            <p style="margin:0 0 20px;font-size:15px;">Your reservation has been cancelled successfully.</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;width:38%;">Booking ID</td><td style="padding:10px 12px;">#${booking.id}</td></tr>
+              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Vehicle</td><td style="padding:10px 12px;">${vehicleLabel} (${plateNumber})</td></tr>
+              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Pickup</td><td style="padding:10px 12px;">${pickupDisplay}</td></tr>
+              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Return</td><td style="padding:10px 12px;">${returnDisplay}</td></tr>
+              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Status</td><td style="padding:10px 12px;">Cancelled</td></tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  const text = [
+    `Hello ${booking.customer?.firstName || "Guest"},`,
+    "",
+    "Your reservation has been cancelled successfully.",
+    `Booking ID: #${booking.id}`,
+    `Vehicle: ${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""} (${booking.vehicle?.plateNumber || "N/A"})`,
+    `Pickup: ${formatDateTimeForEmail(booking.pickupDatetime)}`,
+    `Return: ${formatDateTimeForEmail(booking.returnDatetime)}`,
+    "Status: Cancelled",
+  ].join("\n");
+
+  if (!hasSmtpConfig()) {
+    return {
+      sent: false,
+      reason: "smtp_not_configured",
+      message: "Booking cancelled, but SMTP is not configured for confirmation email.",
+    };
+  }
+
+  try {
+    const result = await sendEmail({
+      to: email,
+      subject,
+      html,
+      text,
+    });
+
+    return {
+      sent: result.sent,
+      reason: result.reason,
+      message: result.sent
+        ? "Cancellation confirmation email sent."
+        : "Booking cancelled, but cancellation email failed.",
+    };
+  } catch {
+    return {
+      sent: false,
+      reason: "smtp_error",
+      message: "Booking cancelled, but cancellation email failed.",
+    };
+  }
+}
+
 async function createPublicReservation(data) {
   validatePublicReservationPayload(data);
 
   const customer = await findOrCreatePublicCustomer(data.customer || {});
 
-  return createBooking({
+  const booking = await createBooking({
     customerId: customer.id,
     vehicleId: data.vehicleId,
     pickupDatetime: data.pickupDatetime,
@@ -509,6 +783,86 @@ async function createPublicReservation(data) {
     status: "reserved",
     paymentStatus: "paid",
   });
+
+  const confirmation = await sendReservationConfirmationEmail(booking);
+
+  return {
+    ...booking,
+    confirmationEmail: {
+      sent: confirmation.sent,
+      message: confirmation.message,
+      links: confirmation.links,
+    },
+  };
+}
+
+function verifyGuestManageToken(token) {
+  try {
+    const payload = jwt.verify(token, getJwtSecret());
+    if (payload.type !== "booking_manage") {
+      throw buildAppError("Invalid booking management token", 401);
+    }
+    return payload;
+  } catch {
+    throw buildAppError("Invalid or expired booking management token", 401);
+  }
+}
+
+async function getBookingByManageToken(token) {
+  const payload = verifyGuestManageToken(token);
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: Number(payload.bookingId) },
+    include: {
+      customer: true,
+      vehicle: true,
+      checkout: true,
+      checkin: true,
+      documents: true,
+    },
+  });
+
+  if (!booking) {
+    throw buildAppError("Booking not found", 404);
+  }
+
+  if (
+    normalizeEmail(booking.customer?.email) !== normalizeEmail(payload.email) ||
+    normalizeName(booking.customer?.lastName) !== normalizeName(payload.lastName)
+  ) {
+    throw buildAppError("Booking management token no longer matches booking guest", 403);
+  }
+
+  return booking;
+}
+
+async function rescheduleBookingByManageToken(token, data = {}) {
+  const booking = await getBookingByManageToken(token);
+
+  if (booking.status !== "reserved") {
+    throw buildAppError("Only reserved bookings can be modified", 400);
+  }
+
+  return rescheduleBooking(booking.id, {
+    pickupDatetime: data.pickupDatetime,
+    returnDatetime: data.returnDatetime,
+  });
+}
+
+async function cancelBookingByManageToken(token) {
+  const booking = await getBookingByManageToken(token);
+
+  if (booking.status !== "reserved") {
+    throw buildAppError("Only reserved bookings can be cancelled", 400);
+  }
+
+  const cancelledBooking = await changeBookingStatus(booking.id, "cancelled");
+  const cancellationEmail = await sendReservationCancellationEmail(cancelledBooking);
+
+  return {
+    ...cancelledBooking,
+    cancellationEmail,
+  };
 }
 
 async function findPublicCustomerByContact(contact = {}) {
@@ -545,6 +899,231 @@ async function findPublicCustomerByContact(contact = {}) {
   });
 
   return customer;
+}
+
+async function createGuestPrecheckoutLink(bookingId) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: Number(bookingId) },
+    include: {
+      customer: true,
+      vehicle: true,
+    },
+  });
+
+  if (!booking) {
+    throw buildAppError("Booking not found", 404);
+  }
+
+  const email = normalizeEmail(booking.customer?.email);
+  const lastName = normalizeName(booking.customer?.lastName);
+
+  if (!email || !lastName) {
+    throw buildAppError("Guest must have email and last name to receive pre-checkout link", 400, {
+      contact: "Customer email and last name are required",
+    });
+  }
+
+  const token = jwt.sign(
+    {
+      type: "precheckout",
+      bookingId: booking.id,
+      email,
+      lastName,
+    },
+    getJwtSecret(),
+    { expiresIn: "48h" }
+  );
+
+  const frontendBase = process.env.FRONTEND_BASE_URL || "http://localhost:3000";
+  const link = `${frontendBase.replace(/\/$/, "")}/guest-precheckout/${token}`;
+
+  let emailSent = false;
+  let deliveryMessage = "Pre-checkout link generated. SMTP not configured; share link manually.";
+
+  const subject = `Complete pre-checkout for booking #${booking.id}`;
+  const html = `<p>Hello ${booking.customer.firstName || "Guest"},</p><p>Please complete your pre-checkout identity step using this secure link:</p><p><a href="${link}">${link}</a></p>`;
+  const text = `Complete pre-checkout for booking #${booking.id}: ${link}`;
+
+  if (hasSmtpConfig()) {
+    try {
+      const result = await sendEmail({
+        to: email,
+        subject,
+        html,
+        text,
+      });
+
+      emailSent = result.sent;
+      deliveryMessage = result.sent
+        ? "Pre-checkout link sent to guest email."
+        : "Link generated, but SMTP dispatch failed.";
+    } catch {
+      emailSent = false;
+      deliveryMessage = "Link generated, but SMTP dispatch failed.";
+    }
+  } else if (process.env.PRECHECKOUT_EMAIL_WEBHOOK_URL) {
+    try {
+      const response = await fetch(process.env.PRECHECKOUT_EMAIL_WEBHOOK_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: email,
+          subject,
+          html,
+          text,
+          bookingId: booking.id,
+        }),
+      });
+
+      emailSent = response.ok;
+      deliveryMessage = response.ok
+        ? "Pre-checkout link sent to guest email."
+        : "Link generated, but email dispatch failed.";
+    } catch {
+      emailSent = false;
+      deliveryMessage = "Link generated, but email dispatch failed.";
+    }
+  }
+
+  return {
+    bookingId: booking.id,
+    guestEmail: email,
+    link,
+    token,
+    emailSent,
+    message: deliveryMessage,
+  };
+}
+
+function verifyPrecheckoutToken(token) {
+  try {
+    const payload = jwt.verify(token, getJwtSecret());
+    if (payload.type !== "precheckout") {
+      throw buildAppError("Invalid pre-checkout token", 401);
+    }
+    return payload;
+  } catch {
+    throw buildAppError("Invalid or expired pre-checkout token", 401);
+  }
+}
+
+async function getPrecheckoutBookingByToken(token) {
+  const payload = verifyPrecheckoutToken(token);
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: Number(payload.bookingId) },
+    include: {
+      customer: true,
+      vehicle: true,
+      documents: true,
+    },
+  });
+
+  if (!booking) {
+    throw buildAppError("Booking not found", 404);
+  }
+
+  if (
+    normalizeEmail(booking.customer?.email) !== normalizeEmail(payload.email) ||
+    normalizeName(booking.customer?.lastName) !== normalizeName(payload.lastName)
+  ) {
+    throw buildAppError("Pre-checkout token no longer matches booking guest", 403);
+  }
+
+  return booking;
+}
+
+async function uploadPrecheckoutGuestDocument(token, documentKind, file) {
+  if (!file) {
+    throw buildAppError("Photo upload is required", 400, {
+      photo: "Photo is required",
+    });
+  }
+
+  const booking = await getPrecheckoutBookingByToken(token);
+
+  const normalizedKind = String(documentKind || "").trim().toLowerCase();
+  const documentType =
+    normalizedKind === "license"
+      ? "precheckout_license"
+      : normalizedKind === "selfie"
+        ? "precheckout_selfie_with_license"
+        : null;
+
+  if (!documentType) {
+    throw buildAppError("Invalid document type", 400, {
+      documentType: "Use 'license' or 'selfie'",
+    });
+  }
+
+  const document = await prisma.document.create({
+    data: {
+      bookingId: Number(booking.id),
+      customerId: booking.customerId,
+      documentType,
+      fileUrl: file.path,
+    },
+  });
+
+  return {
+    bookingId: booking.id,
+    document,
+  };
+}
+
+async function getPublicBookingByIdForGuest(id, guest = {}) {
+  const email = normalizeEmail(guest.email);
+  const phone = normalizePhone(guest.phone);
+  const lastName = normalizeName(guest.lastName);
+
+  if ((!email && !phone) || !lastName) {
+    throw buildAppError("Verification details are required", 400, {
+      verification: "Provide last name and either email or phone",
+    });
+  }
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: Number(id) },
+    include: {
+      customer: true,
+      vehicle: true,
+      checkout: true,
+      checkin: true,
+      documents: true,
+    },
+  });
+
+  if (!booking) {
+    throw buildAppError("Booking not found", 404);
+  }
+
+  const customerLastName = normalizeName(booking.customer?.lastName);
+  const customerEmail = normalizeEmail(booking.customer?.email);
+  const customerPhone = normalizePhone(booking.customer?.phone);
+
+  const contactMatch =
+    (email && customerEmail && email === customerEmail) ||
+    (phone && customerPhone && phone === customerPhone);
+
+  if (!contactMatch || customerLastName !== lastName) {
+    throw buildAppError("Guest verification failed", 403, {
+      verification: "Booking details do not match guest identity",
+    });
+  }
+
+  return booking;
+}
+
+async function checkoutBookingPublic(id, data, photos = [], guest = {}) {
+  await getPublicBookingByIdForGuest(id, guest);
+  return checkoutBooking(id, data, photos);
+}
+
+async function checkinBookingPublic(id, data, photos = [], guest = {}) {
+  await getPublicBookingByIdForGuest(id, guest);
+  return checkinBooking(id, data, photos);
 }
 
 async function updateBooking(id, data) {
@@ -826,12 +1405,21 @@ module.exports = {
   getBookingById,
   createBooking,
   createPublicReservation,
+  createGuestPrecheckoutLink,
+  getPrecheckoutBookingByToken,
+  uploadPrecheckoutGuestDocument,
+  getBookingByManageToken,
+  rescheduleBookingByManageToken,
+  cancelBookingByManageToken,
   findPublicCustomerByContact,
+  getPublicBookingByIdForGuest,
   updateBooking,
   rescheduleBooking,
   changeBookingStatus,
   checkoutBooking,
+  checkoutBookingPublic,
   checkinBooking,
+  checkinBookingPublic,
   checkVehicleAvailability,
   calculateBookingAmounts,
   calculateRentalDays,

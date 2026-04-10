@@ -11,6 +11,7 @@ const {
   changeBookingStatus,
   checkinBooking,
   checkoutBooking,
+  createGuestPrecheckoutLink,
 } = require("../controllers/bookingController");
 
 const { protect } = require("../middleware/authMiddleware");
@@ -26,6 +27,7 @@ router.patch("/:id", protect, updateBooking);
 // workflow actions
 router.patch("/:id/status", protect, changeBookingStatus);
 router.patch("/:id/reschedule", protect, rescheduleBooking);
+router.post("/:id/precheckout-link", protect, createGuestPrecheckoutLink);
 
 // ✅ photo upload routes
 router.post("/:id/checkout", protect, upload.array("photos", 20), checkoutBooking);

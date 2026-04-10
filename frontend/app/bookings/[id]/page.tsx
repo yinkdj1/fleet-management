@@ -56,6 +56,9 @@ export default function BookingDetailPage() {
   const bookingId = params.id;
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [error, setError] = useState("");
+  const [precheckoutMessage, setPrecheckoutMessage] = useState("");
+  const [precheckoutLink, setPrecheckoutLink] = useState("");
+  const [sendingPrecheckoutLink, setSendingPrecheckoutLink] = useState(false);
 
   useEffect(() => {
     fetchBooking();
@@ -75,6 +78,42 @@ export default function BookingDetailPage() {
 
   const checkinPhotos =
     booking?.documents?.filter((doc) => doc.documentType === "checkin_photo") || [];
+
+  const precheckoutLicenseDocs =
+    booking?.documents?.filter((doc) => doc.documentType === "precheckout_license") || [];
+
+  const precheckoutSelfieDocs =
+    booking?.documents?.filter((doc) => doc.documentType === "precheckout_selfie_with_license") || [];
+
+  const sendPrecheckoutLink = async () => {
+    setPrecheckoutMessage("");
+    setPrecheckoutLink("");
+
+    try {
+      setSendingPrecheckoutLink(true);
+      const res = await api.post(`/bookings/${bookingId}/precheckout-link`);
+      const data = res.data?.data;
+
+      setPrecheckoutMessage(data?.message || "Pre-checkout link created.");
+
+      if (data?.link) {
+        setPrecheckoutLink(data.link);
+        if (navigator?.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(data.link);
+          } catch {
+            // Ignore clipboard failures in unsupported contexts.
+          }
+        }
+      }
+    } catch (err: any) {
+      setPrecheckoutMessage(
+        err.response?.data?.message || "Unable to create pre-checkout link"
+      );
+    } finally {
+      setSendingPrecheckoutLink(false);
+    }
+  };
 
   return (
     <AppShell>
@@ -136,6 +175,93 @@ export default function BookingDetailPage() {
                 </p>
                 <p>{booking.vehicle?.plateNumber}</p>
                 <p>{booking.vehicle?.year}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="font-semibold text-zinc-900">Guest Pre-checkout</p>
+                  <p className="text-sm text-zinc-600">
+                    Send a secure link for guest license + selfie verification.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={sendPrecheckoutLink}
+                  disabled={sendingPrecheckoutLink}
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-white disabled:opacity-60"
+                >
+                  {sendingPrecheckoutLink ? "Sending..." : "Send Pre-checkout Link"}
+                </button>
+              </div>
+
+              {precheckoutMessage && (
+                <p className="mt-3 text-sm text-zinc-700">{precheckoutMessage}</p>
+              )}
+
+              {precheckoutLink && (
+                <a
+                  href={precheckoutLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 block break-all text-sm text-blue-700 underline"
+                >
+                  {precheckoutLink}
+                </a>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-6">
+            <h2 className="text-xl font-semibold mb-4">Pre-checkout Verification</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="font-semibold mb-3">License Upload</p>
+                {precheckoutLicenseDocs.length === 0 ? (
+                  <p className="text-gray-500">No license uploaded.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {precheckoutLicenseDocs.map((doc) => (
+                      <a
+                        key={doc.id}
+                        href={`http://localhost:5000${doc.fileUrl}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <img
+                          src={`http://localhost:5000${doc.fileUrl}`}
+                          alt="License"
+                          className="w-full h-40 object-cover rounded-lg border"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="font-semibold mb-3">Selfie With License</p>
+                {precheckoutSelfieDocs.length === 0 ? (
+                  <p className="text-gray-500">No selfie uploaded.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {precheckoutSelfieDocs.map((doc) => (
+                      <a
+                        key={doc.id}
+                        href={`http://localhost:5000${doc.fileUrl}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <img
+                          src={`http://localhost:5000${doc.fileUrl}`}
+                          alt="Selfie with license"
+                          className="w-full h-40 object-cover rounded-lg border"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

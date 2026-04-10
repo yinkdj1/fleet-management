@@ -165,6 +165,114 @@ async function getPublicCustomerByContact(req, res, next) {
   }
 }
 
+async function getPublicGuestBooking(req, res, next) {
+  try {
+    const booking = await bookingService.getPublicBookingByIdForGuest(
+      req.params.id,
+      {
+        email: req.query.email,
+        phone: req.query.phone,
+        lastName: req.query.lastName,
+      }
+    );
+
+    res.json({ data: booking });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function checkoutPublicGuestBooking(req, res, next) {
+  try {
+    const booking = await bookingService.checkoutBookingPublic(
+      req.params.id,
+      req.body,
+      req.files || [],
+      {
+        email: req.body.email,
+        phone: req.body.phone,
+        lastName: req.body.lastName,
+      }
+    );
+
+    res.json({ data: booking });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function checkinPublicGuestBooking(req, res, next) {
+  try {
+    const booking = await bookingService.checkinBookingPublic(
+      req.params.id,
+      req.body,
+      req.files || [],
+      {
+        email: req.body.email,
+        phone: req.body.phone,
+        lastName: req.body.lastName,
+      }
+    );
+
+    res.json({ data: booking });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getPublicPrecheckoutBooking(req, res, next) {
+  try {
+    const booking = await bookingService.getPrecheckoutBookingByToken(req.params.token);
+    res.json({ data: booking });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function uploadPublicPrecheckoutDocument(req, res, next) {
+  try {
+    const payload = await bookingService.uploadPrecheckoutGuestDocument(
+      req.params.token,
+      req.body.documentType || req.query.documentType,
+      req.file
+    );
+
+    res.status(201).json({ data: payload });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getPublicManageBooking(req, res, next) {
+  try {
+    const booking = await bookingService.getBookingByManageToken(req.params.token);
+    res.json({ data: booking });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function modifyPublicManageBooking(req, res, next) {
+  try {
+    const booking = await bookingService.rescheduleBookingByManageToken(
+      req.params.token,
+      req.body
+    );
+    res.json({ data: booking });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function cancelPublicManageBooking(req, res, next) {
+  try {
+    const booking = await bookingService.cancelBookingByManageToken(req.params.token);
+    res.json({ data: booking });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function createPublicReservation(req, res, next) {
   try {
     const reservation = await bookingService.createPublicReservation(req.body);
@@ -186,6 +294,14 @@ async function createTestPayment(req, res, next) {
 module.exports = {
   getPublicAvailableVehicles: getAvailableVehicles,
   getPublicCustomerByContact,
+  getPublicGuestBooking,
+  checkoutPublicGuestBooking,
+  checkinPublicGuestBooking,
+  getPublicPrecheckoutBooking,
+  uploadPublicPrecheckoutDocument,
+  getPublicManageBooking,
+  modifyPublicManageBooking,
+  cancelPublicManageBooking,
   getPublicGeocodeSearch,
   getPublicGeocodeReverse,
   createTestPayment,

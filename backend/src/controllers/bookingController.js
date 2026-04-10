@@ -72,6 +72,15 @@ async function checkinBooking(req, res, next) {
   }
 }
 
+async function createGuestPrecheckoutLink(req, res, next) {
+  try {
+    const payload = await bookingService.createGuestPrecheckoutLink(req.params.id);
+    res.json({ data: payload });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getBookings,
   getBookingById,
@@ -81,4 +90,5 @@ module.exports = {
   changeBookingStatus,
   checkoutBooking,
   checkinBooking,
+  createGuestPrecheckoutLink,
 };
