@@ -42,6 +42,7 @@ model Customer {
   email            String?   @unique
   phone            String?
   driversLicenseNo String?
+  dateOfBirth      DateTime?
   licenseExpiry    DateTime?
   bookings         Booking[]
   createdAt        DateTime  @default(now())

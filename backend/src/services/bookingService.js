@@ -312,6 +312,19 @@ function validatePublicReservationPayload(data = {}) {
     errors.contact = "Either email or phone is required";
   }
 
+  if (!customer.driversLicenseNo || !String(customer.driversLicenseNo).trim()) {
+    errors.driversLicenseNo = "Driver's license number is required";
+  }
+
+  if (!customer.dateOfBirth) {
+    errors.dateOfBirth = "Date of birth is required";
+  } else {
+    const dob = new Date(customer.dateOfBirth);
+    if (Number.isNaN(dob.getTime())) {
+      errors.dateOfBirth = "Date of birth is invalid";
+    }
+  }
+
   if (customer.email) {
     const email = String(customer.email).trim();
     const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -332,6 +345,18 @@ function validatePublicReservationPayload(data = {}) {
     errors.returnDatetime = "Return datetime is required";
   }
 
+  if (data.paymentStatus !== "paid") {
+    errors.paymentStatus = "Payment must be completed before confirming reservation";
+  }
+
+  if (!data.paymentReference || !String(data.paymentReference).trim()) {
+    errors.paymentReference = "Payment reference is required";
+  }
+
+  if (!data.paymentConfirmed) {
+    errors.paymentConfirmed = "Please confirm payment before submitting";
+  }
+
   if (Object.keys(errors).length > 0) {
     throw buildAppError("Validation failed", 400, errors);
   }
@@ -344,6 +369,9 @@ async function findOrCreatePublicCustomer(customerData) {
   const phone = customerData.phone ? String(customerData.phone).trim() : null;
   const driversLicenseNo = customerData.driversLicenseNo
     ? String(customerData.driversLicenseNo).trim()
+    : null;
+  const dateOfBirth = customerData.dateOfBirth
+    ? new Date(customerData.dateOfBirth)
     : null;
 
   if (email) {
@@ -359,6 +387,7 @@ async function findOrCreatePublicCustomer(customerData) {
           lastName: lastName || existingByEmail.lastName,
           phone: phone || existingByEmail.phone,
           driversLicenseNo: driversLicenseNo || existingByEmail.driversLicenseNo,
+          dateOfBirth: dateOfBirth || existingByEmail.dateOfBirth,
         },
       });
     }
@@ -372,6 +401,7 @@ async function findOrCreatePublicCustomer(customerData) {
         email,
         phone,
         driversLicenseNo,
+        dateOfBirth,
       },
     });
   } catch (error) {
@@ -399,6 +429,7 @@ async function createPublicReservation(data) {
     pickupDatetime: data.pickupDatetime,
     returnDatetime: data.returnDatetime,
     status: "reserved",
+    paymentStatus: "paid",
   });
 }
 

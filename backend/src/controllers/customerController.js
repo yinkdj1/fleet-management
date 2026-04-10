@@ -61,7 +61,7 @@ async function getCustomerById(req, res, next) {
 
 async function createCustomer(req, res, next) {
   try {
-    const { firstName, lastName, email, phone, driversLicenseNo, licenseExpiry } = req.body;
+    const { firstName, lastName, email, phone, driversLicenseNo, dateOfBirth, licenseExpiry } = req.body;
 
     if (!firstName || !lastName) {
       const error = new Error("First name and last name are required");
@@ -76,6 +76,7 @@ async function createCustomer(req, res, next) {
         email: email || null,
         phone: phone || null,
         driversLicenseNo: driversLicenseNo || null,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : null,
       },
     });
@@ -92,7 +93,7 @@ async function createCustomer(req, res, next) {
 
 async function updateCustomer(req, res, next) {
   try {
-    const { firstName, lastName, email, phone, driversLicenseNo, licenseExpiry } = req.body;
+    const { firstName, lastName, email, phone, driversLicenseNo, dateOfBirth, licenseExpiry } = req.body;
 
     const customer = await prisma.customer.update({
       where: { id: Number(req.params.id) },
@@ -102,6 +103,7 @@ async function updateCustomer(req, res, next) {
         email: email || null,
         phone: phone || null,
         driversLicenseNo: driversLicenseNo || null,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : null,
       },
     });

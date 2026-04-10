@@ -2,6 +2,7 @@ const express = require("express");
 
 const {
   getPublicAvailableVehicles,
+  createTestPayment,
   createPublicReservation,
 } = require("../controllers/publicController");
 const {
@@ -23,7 +24,19 @@ const reservationRateLimiter = createRateLimiter({
   keySuffix: "public-reservations",
 });
 
+const paymentRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 20,
+  keySuffix: "public-payments",
+});
+
 router.get("/vehicles/available", vehiclesRateLimiter, getPublicAvailableVehicles);
+router.post(
+  "/payments/test-charge",
+  paymentRateLimiter,
+  honeypotGuard,
+  createTestPayment
+);
 router.post(
   "/reservations",
   reservationRateLimiter,

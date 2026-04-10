@@ -17,9 +17,19 @@ type ReservationForm = {
   email: string;
   phone: string;
   driversLicenseNo: string;
+  dateOfBirth: string;
   pickupDatetime: string;
   returnDatetime: string;
   vehicleId: string;
+  paymentReference: string;
+  paymentConfirmed: boolean;
+};
+
+type PaymentForm = {
+  cardholderName: string;
+  cardNumber: string;
+  expiry: string;
+  cvv: string;
 };
 
 type FieldErrors = Partial<
@@ -30,9 +40,13 @@ type FieldErrors = Partial<
     | "phone"
     | "contact"
     | "driversLicenseNo"
+    | "dateOfBirth"
     | "pickupDatetime"
     | "returnDatetime"
-    | "vehicleId",
+    | "vehicleId"
+    | "paymentReference"
+    | "paymentStatus"
+    | "paymentConfirmed",
     string
   >
 >;
@@ -63,7 +77,16 @@ export default function ReservePage() {
   const [success, setSuccess] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [paying, setPaying] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState("");
+
+  const [paymentForm, setPaymentForm] = useState<PaymentForm>({
+    cardholderName: "",
+    cardNumber: "",
+    expiry: "",
+    cvv: "",
+  });
 
   const [form, setForm] = useState<ReservationForm>({
     firstName: "",
@@ -71,9 +94,12 @@ export default function ReservePage() {
     email: "",
     phone: "",
     driversLicenseNo: "",
+    dateOfBirth: "",
     pickupDatetime: "",
     returnDatetime: "",
     vehicleId: "",
+    paymentReference: "",
+    paymentConfirmed: false,
   });
 
   useEffect(() => {
@@ -145,15 +171,38 @@ export default function ReservePage() {
     return { days, dailyRate, subtotal, tax, deposit, total };
   }, [selectedVehicle, form.pickupDatetime, form.returnDatetime]);
 
+  const resetPaymentState = () => {
+    setForm((prev) => ({
+      ...prev,
+      paymentReference: "",
+      paymentConfirmed: false,
+    }));
+    setPaymentMessage("");
+    setFieldErrors((prev) => ({
+      ...prev,
+      paymentReference: "",
+      paymentConfirmed: "",
+      paymentStatus: "",
+    }));
+  };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    const value =
+      e.target instanceof HTMLInputElement && e.target.type === "checkbox"
+        ? e.target.checked
+        : e.target.value;
 
     setForm((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: value as never,
     }));
+
+    if (["pickupDatetime", "returnDatetime", "vehicleId"].includes(name)) {
+      resetPaymentState();
+    }
 
     setFieldErrors((prev) => ({
       ...prev,
@@ -165,6 +214,84 @@ export default function ReservePage() {
     if (success) setSuccess("");
   };
 
+  const handlePaymentInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+
+    setPaymentForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    if (fieldErrors.paymentReference || fieldErrors.paymentConfirmed || fieldErrors.paymentStatus) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        paymentReference: "",
+        paymentConfirmed: "",
+        paymentStatus: "",
+      }));
+    }
+
+    if (paymentMessage) {
+      setPaymentMessage("");
+    }
+  };
+
+  const handleTestPayment = async () => {
+    setError("");
+    setPaymentMessage("");
+    setFieldErrors((prev) => ({
+      ...prev,
+      paymentReference: "",
+      paymentConfirmed: "",
+      paymentStatus: "",
+    }));
+
+    if (!pricePreview) {
+      setError("Select valid reservation dates and a vehicle before payment.");
+      return;
+    }
+
+    try {
+      setPaying(true);
+
+      const res = await api.post("/public/payments/test-charge", {
+        cardholderName: paymentForm.cardholderName.trim(),
+        cardNumber: paymentForm.cardNumber,
+        expiry: paymentForm.expiry.trim(),
+        cvv: paymentForm.cvv,
+        amount: pricePreview.total,
+        currency: "USD",
+      });
+
+      const payload = res.data?.data || {};
+
+      setForm((prev) => ({
+        ...prev,
+        paymentReference: payload.paymentReference || "",
+        paymentConfirmed: payload.status === "paid",
+      }));
+
+      setPaymentMessage(
+        payload.status === "paid"
+          ? `Payment successful (${payload.cardBrand?.toUpperCase()} ****${payload.last4}). Ref: ${payload.paymentReference}`
+          : "Payment not completed."
+      );
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Payment failed");
+      setFieldErrors((prev) => ({
+        ...prev,
+        ...(err.response?.data?.errors || {}),
+      }));
+      setForm((prev) => ({
+        ...prev,
+        paymentReference: "",
+        paymentConfirmed: false,
+      }));
+    } finally {
+      setPaying(false);
+    }
+  };
+
   const validateClientSide = () => {
     const errors: FieldErrors = {};
 
@@ -173,10 +300,22 @@ export default function ReservePage() {
     if (!form.email.trim() && !form.phone.trim()) {
       errors.contact = "Provide at least email or phone";
     }
+    if (!form.driversLicenseNo.trim()) {
+      errors.driversLicenseNo = "Driver's license number is required";
+    }
+    if (!form.dateOfBirth) {
+      errors.dateOfBirth = "Date of birth is required";
+    }
 
     if (!form.pickupDatetime) errors.pickupDatetime = "Pickup date/time is required";
     if (!form.returnDatetime) errors.returnDatetime = "Return date/time is required";
     if (!form.vehicleId) errors.vehicleId = "Please choose a vehicle";
+    if (!form.paymentReference.trim()) {
+      errors.paymentReference = "Payment reference is required";
+    }
+    if (!form.paymentConfirmed) {
+      errors.paymentConfirmed = "Confirm payment before submitting";
+    }
 
     if (
       form.pickupDatetime &&
@@ -211,11 +350,15 @@ export default function ReservePage() {
           lastName: form.lastName.trim(),
           email: form.email.trim() || null,
           phone: form.phone.trim() || null,
-          driversLicenseNo: form.driversLicenseNo.trim() || null,
+          driversLicenseNo: form.driversLicenseNo.trim(),
+          dateOfBirth: form.dateOfBirth,
         },
         vehicleId: Number(form.vehicleId),
         pickupDatetime: new Date(form.pickupDatetime).toISOString(),
         returnDatetime: new Date(form.returnDatetime).toISOString(),
+        paymentStatus: "paid",
+        paymentReference: form.paymentReference.trim(),
+        paymentConfirmed: form.paymentConfirmed,
       });
 
       const bookingId = res.data?.data?.id;
@@ -231,9 +374,12 @@ export default function ReservePage() {
         email: form.email,
         phone: form.phone,
         driversLicenseNo: form.driversLicenseNo,
+        dateOfBirth: form.dateOfBirth,
         pickupDatetime: "",
         returnDatetime: "",
         vehicleId: "",
+        paymentReference: "",
+        paymentConfirmed: false,
       });
       setVehicles([]);
     } catch (err: any) {
@@ -311,14 +457,35 @@ export default function ReservePage() {
               <p className="text-sm text-red-600">{fieldErrors.contact || "Provide at least email or phone."}</p>
             )}
 
-            <div>
-              <label className="block mb-1 text-sm font-medium text-zinc-700">Driver's License (optional)</label>
-              <input
-                name="driversLicenseNo"
-                value={form.driversLicenseNo}
-                onChange={handleChange}
-                className="w-full rounded-xl border border-zinc-300 bg-white p-3"
-              />
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block mb-1 text-sm font-medium text-zinc-700">Driver's License</label>
+                <input
+                  name="driversLicenseNo"
+                  value={form.driversLicenseNo}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                  required
+                />
+                {fieldErrors.driversLicenseNo && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.driversLicenseNo}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block mb-1 text-sm font-medium text-zinc-700">Date of Birth</label>
+                <input
+                  type="date"
+                  name="dateOfBirth"
+                  value={form.dateOfBirth}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                  required
+                />
+                {fieldErrors.dateOfBirth && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.dateOfBirth}</p>
+                )}
+              </div>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
@@ -373,12 +540,87 @@ export default function ReservePage() {
               {fieldErrors.vehicleId && <p className="mt-1 text-sm text-red-600">{fieldErrors.vehicleId}</p>}
             </div>
 
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-3">
+              <p className="text-sm font-semibold text-emerald-900">Credit Card Payment (Test Mode)</p>
+              <p className="text-xs text-emerald-800">
+                This is a development placeholder. It simulates online card payment and will be replaced with Stripe in production.
+              </p>
+              <div>
+                <label className="block mb-1 text-sm font-medium text-zinc-700">Cardholder Name</label>
+                <input
+                  name="cardholderName"
+                  value={paymentForm.cardholderName}
+                  onChange={handlePaymentInputChange}
+                  className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-sm font-medium text-zinc-700">Card Number</label>
+                <input
+                  name="cardNumber"
+                  value={paymentForm.cardNumber}
+                  onChange={handlePaymentInputChange}
+                  className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                  placeholder="4242 4242 4242 4242"
+                />
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-zinc-700">Expiry (MM/YY)</label>
+                  <input
+                    name="expiry"
+                    value={paymentForm.expiry}
+                    onChange={handlePaymentInputChange}
+                    className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                    placeholder="12/30"
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-zinc-700">CVV</label>
+                  <input
+                    name="cvv"
+                    value={paymentForm.cvv}
+                    onChange={handlePaymentInputChange}
+                    className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                    placeholder="123"
+                  />
+                </div>
+              </div>
+
+              {fieldErrors.paymentStatus && (
+                <p className="text-sm text-red-600">{fieldErrors.paymentStatus}</p>
+              )}
+              {fieldErrors.paymentReference && (
+                <p className="text-sm text-red-600">{fieldErrors.paymentReference}</p>
+              )}
+              {fieldErrors.paymentConfirmed && (
+                <p className="text-sm text-red-600">{fieldErrors.paymentConfirmed}</p>
+              )}
+
+              {paymentMessage && <p className="text-sm text-emerald-900">{paymentMessage}</p>}
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleTestPayment}
+                  disabled={paying || !pricePreview}
+                  className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {paying ? "Processing Test Payment..." : "Pay Now (Test)"}
+                </button>
+                {form.paymentConfirmed && (
+                  <span className="text-sm font-semibold text-emerald-900">Payment Confirmed</span>
+                )}
+              </div>
+            </div>
+
             {error && <p className="text-sm text-red-700">{error}</p>}
             {success && <p className="text-sm text-green-700">{success}</p>}
 
             <button
               type="submit"
-              disabled={submitting || loadingVehicles}
+              disabled={submitting || loadingVehicles || !form.paymentConfirmed}
               className="w-full rounded-xl bg-zinc-900 px-4 py-3 font-semibold text-white disabled:opacity-60"
             >
               {submitting ? "Submitting Reservation..." : "Confirm Reservation"}
