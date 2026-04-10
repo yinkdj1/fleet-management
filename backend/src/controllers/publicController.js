@@ -220,6 +220,24 @@ async function checkinPublicGuestBooking(req, res, next) {
   }
 }
 
+async function extendPublicGuestBooking(req, res, next) {
+  try {
+    const booking = await bookingService.extendBookingPublic(
+      req.params.id,
+      req.body,
+      {
+        email: req.body.email,
+        phone: req.body.phone,
+        lastName: req.body.lastName,
+      }
+    );
+
+    res.json({ data: booking });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getPublicPrecheckoutBooking(req, res, next) {
   try {
     const booking = await bookingService.getPrecheckoutBookingByToken(req.params.token);
@@ -297,6 +315,7 @@ module.exports = {
   getPublicGuestBooking,
   checkoutPublicGuestBooking,
   checkinPublicGuestBooking,
+  extendPublicGuestBooking,
   getPublicPrecheckoutBooking,
   uploadPublicPrecheckoutDocument,
   getPublicManageBooking,

@@ -6,6 +6,7 @@ const {
   getPublicGuestBooking,
   checkoutPublicGuestBooking,
   checkinPublicGuestBooking,
+  extendPublicGuestBooking,
   getPublicPrecheckoutBooking,
   uploadPublicPrecheckoutDocument,
   getPublicManageBooking,
@@ -66,6 +67,11 @@ router.post(
   reservationRateLimiter,
   upload.array("photos", 20),
   checkinPublicGuestBooking
+);
+router.post(
+  "/bookings/:id/extend",
+  reservationRateLimiter,
+  extendPublicGuestBooking
 );
 router.get("/geocode/search", vehiclesRateLimiter, getPublicGeocodeSearch);
 router.get("/geocode/reverse", vehiclesRateLimiter, getPublicGeocodeReverse);

@@ -16,6 +16,8 @@ const {
 } = require("./vehicleStatusService");
 const { hasSmtpConfig, sendEmail } = require("./emailService");
 
+const SERVICE_CHARGE_DAILY = 15;
+
 function buildAppError(message, statusCode = 400, errors = null) {
   const error = new Error(message);
   error.statusCode = statusCode;
@@ -49,6 +51,16 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function isWithinGuestManageCutoff(pickupDatetime, now = new Date()) {
+  const pickup = new Date(pickupDatetime);
+  if (Number.isNaN(pickup.getTime())) {
+    return true;
+  }
+
+  const cutoffMs = 24 * 60 * 60 * 1000;
+  return pickup.getTime() - now.getTime() <= cutoffMs;
 }
 
 function roundToTwo(value) {
@@ -118,7 +130,9 @@ function calculateBookingAmounts({ pickupDatetime, returnDatetime, vehicle }) {
   const days = calculateRentalDays(pickupDatetime, returnDatetime);
   const dailyRate = getVehicleDailyRate(vehicle);
 
-  const subtotal = roundToTwo(dailyRate * days);
+  const rentalSubtotal = roundToTwo(dailyRate * days);
+  const serviceCharge = roundToTwo(SERVICE_CHARGE_DAILY * days);
+  const subtotal = roundToTwo(rentalSubtotal + serviceCharge);
   const tax = roundToTwo(subtotal * 0.07);
   const deposit = 100;
   const totalAmount = roundToTwo(subtotal + tax + deposit);
@@ -126,6 +140,8 @@ function calculateBookingAmounts({ pickupDatetime, returnDatetime, vehicle }) {
   return {
     days,
     dailyRate,
+    rentalSubtotal,
+    serviceCharge,
     subtotal,
     tax,
     deposit,
@@ -833,6 +849,13 @@ async function getBookingByManageToken(token) {
     throw buildAppError("Booking management token no longer matches booking guest", 403);
   }
 
+  if (isWithinGuestManageCutoff(booking.pickupDatetime)) {
+    throw buildAppError(
+      "Modify and cancel links are no longer available within 24 hours of pickup",
+      403
+    );
+  }
+
   return booking;
 }
 
@@ -843,10 +866,17 @@ async function rescheduleBookingByManageToken(token, data = {}) {
     throw buildAppError("Only reserved bookings can be modified", 400);
   }
 
-  return rescheduleBooking(booking.id, {
+  // Modify keeps the same reservation; it must not cancel the booking.
+  // rescheduleBooking enforces overlap checks against other reserved/active bookings.
+  const updatedBooking = await rescheduleBooking(booking.id, {
     pickupDatetime: data.pickupDatetime,
     returnDatetime: data.returnDatetime,
   });
+
+  return {
+    ...updatedBooking,
+    status: "reserved",
+  };
 }
 
 async function cancelBookingByManageToken(token) {
@@ -1124,6 +1154,87 @@ async function checkoutBookingPublic(id, data, photos = [], guest = {}) {
 async function checkinBookingPublic(id, data, photos = [], guest = {}) {
   await getPublicBookingByIdForGuest(id, guest);
   return checkinBooking(id, data, photos);
+}
+
+async function extendBookingPublic(id, data = {}, guest = {}) {
+  const booking = await getPublicBookingByIdForGuest(id, guest);
+
+  if (!["reserved", "active"].includes(booking.status)) {
+    throw buildAppError("Only reserved or active bookings can be extended", 400);
+  }
+
+  const requestedReturn = data.returnDatetime || data.newReturnDatetime;
+  if (!requestedReturn) {
+    throw buildAppError("New return datetime is required", 400, {
+      returnDatetime: "New return datetime is required",
+    });
+  }
+
+  const nextReturn = new Date(requestedReturn);
+  if (Number.isNaN(nextReturn.getTime())) {
+    throw buildAppError("New return datetime is invalid", 400, {
+      returnDatetime: "New return datetime is invalid",
+    });
+  }
+
+  if (nextReturn <= new Date(booking.returnDatetime)) {
+    throw buildAppError("New return datetime must be later than current return datetime", 400, {
+      returnDatetime: "Choose a later return datetime to extend your trip",
+    });
+  }
+
+  await checkVehicleAvailability(
+    booking.vehicleId,
+    booking.pickupDatetime,
+    nextReturn,
+    booking.id
+  );
+
+  const vehicle = await ensureVehicleExists(booking.vehicleId);
+  const currentReturn = new Date(booking.returnDatetime);
+  const extensionDays = calculateRentalDays(currentReturn, nextReturn);
+  const dailyRate = getVehicleDailyRate(vehicle);
+  const extensionRentalSubtotal = roundToTwo(dailyRate * extensionDays);
+  const extensionServiceCharge = roundToTwo(SERVICE_CHARGE_DAILY * extensionDays);
+  const extensionSubtotal = roundToTwo(
+    extensionRentalSubtotal + extensionServiceCharge
+  );
+  const extensionTax = roundToTwo(extensionSubtotal * 0.07);
+  const extensionTotal = roundToTwo(extensionSubtotal + extensionTax);
+
+  const nextSubtotal = roundToTwo(Number(booking.subtotal || 0) + extensionSubtotal);
+  const nextTax = roundToTwo(Number(booking.tax || 0) + extensionTax);
+  const nextTotalAmount = roundToTwo(Number(booking.totalAmount || 0) + extensionTotal);
+
+  const updatedBooking = await prisma.booking.update({
+    where: { id: Number(booking.id) },
+    data: {
+      returnDatetime: nextReturn,
+      subtotal: nextSubtotal,
+      tax: nextTax,
+      totalAmount: nextTotalAmount,
+    },
+    include: {
+      customer: true,
+      vehicle: true,
+      checkout: true,
+      checkin: true,
+      documents: true,
+    },
+  });
+
+  return {
+    ...updatedBooking,
+    extensionCharge: {
+      days: extensionDays,
+      dailyRate,
+      rentalSubtotal: extensionRentalSubtotal,
+      serviceCharge: extensionServiceCharge,
+      subtotal: extensionSubtotal,
+      tax: extensionTax,
+      total: extensionTotal,
+    },
+  };
 }
 
 async function updateBooking(id, data) {
@@ -1420,6 +1531,7 @@ module.exports = {
   checkoutBookingPublic,
   checkinBooking,
   checkinBookingPublic,
+  extendBookingPublic,
   checkVehicleAvailability,
   calculateBookingAmounts,
   calculateRentalDays,

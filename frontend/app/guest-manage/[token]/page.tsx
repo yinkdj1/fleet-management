@@ -39,6 +39,8 @@ export default function GuestManageBookingPage() {
 
   const token = String(params.token || "");
   const initialAction = searchParams.get("action") || "";
+  const isModifyFlow = initialAction === "modify";
+  const isCancelFlow = initialAction === "cancel";
 
   const [booking, setBooking] = useState<BookingInfo | null>(null);
   const [pickupDatetime, setPickupDatetime] = useState("");
@@ -74,13 +76,13 @@ export default function GuestManageBookingPage() {
   }, [token]);
 
   useEffect(() => {
-    if (initialAction === "cancel") {
+    if (isCancelFlow) {
       setMessage("This link opened the cancel flow. Review and confirm below.");
     }
-    if (initialAction === "modify") {
-      setMessage("This link opened the modify flow. Update dates below.");
+    if (isModifyFlow) {
+      setMessage("This link opened the modify flow. Update dates and save your reservation.");
     }
-  }, [initialAction]);
+  }, [isCancelFlow, isModifyFlow]);
 
   const handleModify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +105,9 @@ export default function GuestManageBookingPage() {
         pickupDatetime: new Date(pickupDatetime).toISOString(),
         returnDatetime: new Date(returnDatetime).toISOString(),
       });
-      setMessage("Booking updated successfully.");
+      setMessage(
+        "Booking updated successfully. Your reservation remains active with the new dates."
+      );
       await loadBooking();
     } catch (err: any) {
       setError(err.response?.data?.message || "Unable to modify booking.");
@@ -168,7 +172,7 @@ export default function GuestManageBookingPage() {
           </section>
         )}
 
-        {booking && canEdit && (
+        {booking && canEdit && !isCancelFlow && (
           <form onSubmit={handleModify} className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold text-zinc-900">Modify Reservation</h2>
 
@@ -204,7 +208,7 @@ export default function GuestManageBookingPage() {
           </form>
         )}
 
-        {booking && canEdit && (
+        {booking && canEdit && !isModifyFlow && (
           <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900">Cancel Reservation</h2>
             <p className="text-sm text-zinc-600">

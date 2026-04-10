@@ -196,6 +196,8 @@ function isValidCvv(cvv: string) {
   return /^\d{3,4}$/.test(cvv.trim());
 }
 
+const SERVICE_CHARGE_PER_DAY = 15;
+
 const US_STATES = [
   { code: "AL", name: "Alabama" },
   { code: "AK", name: "Alaska" },
@@ -405,12 +407,23 @@ export default function ReservePage() {
     }
 
     const dailyRate = Number(selectedVehicle.dailyRate || 0);
-    const subtotal = roundToTwo(dailyRate * days);
+    const rentalSubtotal = roundToTwo(dailyRate * days);
+    const serviceCharge = roundToTwo(SERVICE_CHARGE_PER_DAY * days);
+    const subtotal = roundToTwo(rentalSubtotal + serviceCharge);
     const tax = roundToTwo(subtotal * 0.07);
     const deposit = 100;
     const total = roundToTwo(subtotal + tax + deposit);
 
-    return { days, dailyRate, subtotal, tax, deposit, total };
+    return {
+      days,
+      dailyRate,
+      rentalSubtotal,
+      serviceCharge,
+      subtotal,
+      tax,
+      deposit,
+      total,
+    };
   }, [selectedVehicle, form.pickupDatetime, form.returnDatetime]);
 
   const allTermsAccepted = useMemo(
@@ -1314,23 +1327,23 @@ export default function ReservePage() {
 
               <div className="rounded-2xl bg-zinc-900 border border-zinc-700 p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Daily Rate</span>
-                  <span>${pricePreview.dailyRate.toFixed(2)}</span>
+                  <span>
+                    Rental (<em>${pricePreview.dailyRate.toFixed(2)} x {pricePreview.days} days</em>)
+                  </span>
+                  <span>${pricePreview.rentalSubtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Rental Days</span>
-                  <span>{pricePreview.days}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>${pricePreview.subtotal.toFixed(2)}</span>
+                  <span>Service Charge (${SERVICE_CHARGE_PER_DAY}/day)</span>
+                  <span>${pricePreview.serviceCharge.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Tax (7%)</span>
                   <span>${pricePreview.tax.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Deposit</span>
+                  <span>
+                    Deposit (<em>refundable</em>)
+                  </span>
                   <span>${pricePreview.deposit.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between border-t border-zinc-700 pt-2 text-base font-semibold">

@@ -25,6 +25,17 @@ type BookingSummary = {
 
 const FUEL_LEVELS = ["Full", "3/4", "1/2", "1/4", "Empty"];
 
+function toDatetimeLocalInput(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export default function GuestBookingWorkflowPage() {
   const params = useParams();
   const bookingId = String(params.id || "");
@@ -44,6 +55,7 @@ export default function GuestBookingWorkflowPage() {
   const [fuelLevelIn, setFuelLevelIn] = useState("Full");
   const [notesIn, setNotesIn] = useState("");
   const [checkinPhotos, setCheckinPhotos] = useState<FileList | null>(null);
+  const [extendReturnDatetime, setExtendReturnDatetime] = useState("");
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -72,7 +84,12 @@ export default function GuestBookingWorkflowPage() {
         },
       });
 
-      setBooking(res.data?.data || null);
+      const nextBooking = res.data?.data || null;
+      setBooking(nextBooking);
+
+      if (nextBooking?.returnDatetime) {
+        setExtendReturnDatetime(toDatetimeLocalInput(nextBooking.returnDatetime));
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || "Unable to verify booking.");
     } finally {
@@ -155,6 +172,65 @@ export default function GuestBookingWorkflowPage() {
       await loadBooking();
     } catch (err: any) {
       setError(err.response?.data?.message || "Checkin failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitExtendTrip = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!booking) {
+      setError("Verify your booking first.");
+      return;
+    }
+
+    if (!extendReturnDatetime) {
+      setError("Select a new return date/time.");
+      return;
+    }
+
+    const currentReturn = new Date(booking.returnDatetime);
+    const nextReturn = new Date(extendReturnDatetime);
+
+    if (nextReturn <= currentReturn) {
+      setError("New return date/time must be later than current return date/time.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await api.post(`/public/bookings/${bookingId}/extend`, {
+        lastName: lastName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        returnDatetime: nextReturn.toISOString(),
+      });
+
+      const extensionCharge = res.data?.data?.extensionCharge;
+
+      setSuccess(
+        extensionCharge
+          ? `Trip extended successfully. Extension charge: Rental $${Number(
+              extensionCharge.rentalSubtotal || 0
+            ).toFixed(2)}, Service $${Number(
+              extensionCharge.serviceCharge || 0
+            ).toFixed(2)}, Subtotal $${Number(
+              extensionCharge.subtotal || 0
+            ).toFixed(2)}, Tax $${Number(extensionCharge.tax || 0).toFixed(
+              2
+            )}, Total $${Number(extensionCharge.total || 0).toFixed(2)}.`
+          : "Trip extended successfully."
+      );
+      await loadBooking();
+    } catch (err: any) {
+      setError(
+        err.response?.data?.errors?.vehicleId ||
+          err.response?.data?.message ||
+          "Unable to extend trip."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -302,6 +378,39 @@ export default function GuestBookingWorkflowPage() {
               className="w-full rounded-xl bg-green-600 px-4 py-3 font-semibold text-white disabled:opacity-60"
             >
               {submitting ? "Submitting..." : "Submit Checkin"}
+            </button>
+          </form>
+        )}
+
+        {booking && (booking.status === "reserved" || booking.status === "active") && (
+          <form onSubmit={submitExtendTrip} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm space-y-3">
+            <h2 className="text-lg font-semibold text-zinc-900">Extend Trip</h2>
+            <p className="text-sm text-zinc-600">
+              Need more days? Pick a later return date/time. Extension is allowed only if this car is available.
+            </p>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">Current Return</label>
+              <p className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+                {new Date(booking.returnDatetime).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">New Return</label>
+              <input
+                type="datetime-local"
+                value={extendReturnDatetime}
+                onChange={(e) => setExtendReturnDatetime(e.target.value)}
+                min={toDatetimeLocalInput(booking.returnDatetime)}
+                className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white disabled:opacity-60"
+            >
+              {submitting ? "Saving..." : "Save Trip Extension"}
             </button>
           </form>
         )}
