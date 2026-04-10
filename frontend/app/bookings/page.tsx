@@ -33,8 +33,7 @@ export default function BookingsPage() {
   const fetchBookings = async () => {
     try {
       const res = await api.get("/bookings");
-      const payload = res.data;
-      setBookings(Array.isArray(payload) ? payload : payload.data || []);
+      setBookings(res.data?.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load bookings");
     }

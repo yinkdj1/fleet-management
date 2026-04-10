@@ -27,8 +27,9 @@ export default function LoginPage() {
 
     try {
       const res = await api.post("/auth/login", form);
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.user));
+      const payload = res.data?.data || res.data;
+      localStorage.setItem("token", payload.token);
+      localStorage.setItem("user", JSON.stringify(payload.user));
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.response?.data?.message || "Login failed");

@@ -28,7 +28,7 @@ export default function VehiclesPage() {
   const fetchVehicles = async () => {
     try {
       const res = await api.get("/vehicles");
-      setVehicles(res.data);
+      setVehicles(res.data?.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load vehicles");
     }

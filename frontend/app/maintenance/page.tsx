@@ -28,7 +28,7 @@ export default function MaintenancePage() {
   const fetchRecords = async () => {
     try {
       const res = await api.get("/maintenance");
-      setRecords(res.data);
+      setRecords(res.data?.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load maintenance");
     }

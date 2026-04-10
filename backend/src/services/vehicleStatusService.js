@@ -1,7 +1,6 @@
 // src/services/vehicleStatusService.js
 
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../config/db");
 
 async function setVehicleStatus(vehicleId, status) {
   return prisma.vehicle.update({

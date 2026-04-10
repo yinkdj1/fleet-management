@@ -37,7 +37,7 @@ export default function DashboardPage() {
   const fetchSummary = async () => {
     try {
       const res = await api.get("/dashboard/summary");
-      setSummary(res.data);
+      setSummary(res.data?.data || res.data);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load dashboard summary");
     }

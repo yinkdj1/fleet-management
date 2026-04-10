@@ -115,7 +115,7 @@ const total = roundToTwo(subtotal + tax + deposit);
   const fetchCustomers = async () => {
     try {
       const res = await api.get("/customers");
-      setCustomers(res.data);
+      setCustomers(res.data?.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load customers");
     }
@@ -151,11 +151,12 @@ const total = roundToTwo(subtotal + tax + deposit);
         },
       });
 
-      setAvailableVehicles(res.data);
+      const payload = res.data?.data || res.data;
+      setAvailableVehicles(payload);
 
       setForm((prev) => ({
         ...prev,
-        vehicleId: res.data.some((v: Vehicle) => String(v.id) === prev.vehicleId)
+        vehicleId: payload.some((v: Vehicle) => String(v.id) === prev.vehicleId)
           ? prev.vehicleId
           : "",
       }));
