@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bgNight" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#070d1b"/>
+      <stop offset="55%" stop-color="#131f36"/>
+      <stop offset="100%" stop-color="#1b2d49"/>
+    </linearGradient>
+    <linearGradient id="towerNight" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#93c5fd" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="roadNight" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#4b5563"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bgNight)"/>
+
+  <g fill="#f8fafc" opacity="0.85">
+    <circle cx="140" cy="90" r="2"/>
+    <circle cx="240" cy="150" r="1.6"/>
+    <circle cx="380" cy="80" r="2"/>
+    <circle cx="610" cy="140" r="1.8"/>
+    <circle cx="790" cy="100" r="2.2"/>
+    <circle cx="980" cy="150" r="1.7"/>
+    <circle cx="1200" cy="95" r="2"/>
+    <circle cx="1390" cy="130" r="1.9"/>
+  </g>
+
+  <circle cx="1300" cy="145" r="60" fill="#fde68a" opacity="0.95"/>
+
+  <g opacity="0.8">
+    <rect x="95" y="130" width="220" height="170" rx="18" fill="url(#towerNight)"/>
+    <rect x="350" y="92" width="180" height="215" rx="18" fill="url(#towerNight)"/>
+    <rect x="560" y="66" width="230" height="248" rx="18" fill="url(#towerNight)"/>
+    <rect x="836" y="120" width="194" height="182" rx="18" fill="url(#towerNight)"/>
+    <rect x="1070" y="86" width="254" height="226" rx="18" fill="url(#towerNight)"/>
+    <rect x="1362" y="136" width="160" height="172" rx="18" fill="url(#towerNight)"/>
+  </g>
+
+  <rect y="520" width="1600" height="380" fill="url(#roadNight)"/>
+
+  <g opacity="0.82" stroke="#fbbf24" stroke-width="8" stroke-linecap="round">
+    <line x1="120" y1="705" x2="280" y2="705"/>
+    <line x1="400" y1="705" x2="560" y2="705"/>
+    <line x1="680" y1="705" x2="840" y2="705"/>
+    <line x1="960" y1="705" x2="1120" y2="705"/>
+    <line x1="1240" y1="705" x2="1400" y2="705"/>
+  </g>
+
+  <g transform="translate(250 560)">
+    <rect x="0" y="56" width="300" height="66" rx="20" fill="#020617"/>
+    <path d="M38 56 L88 18 L210 18 L262 56 Z" fill="#0f172a"/>
+    <rect x="94" y="26" width="62" height="24" rx="6" fill="#60a5fa"/>
+    <rect x="164" y="26" width="54" height="24" rx="6" fill="#60a5fa"/>
+    <circle cx="66" cy="130" r="24" fill="#020617"/>
+    <circle cx="234" cy="130" r="24" fill="#020617"/>
+    <circle cx="66" cy="130" r="12" fill="#9ca3af"/>
+    <circle cx="234" cy="130" r="12" fill="#9ca3af"/>
+    <rect x="282" y="72" width="24" height="10" rx="5" fill="#f59e0b"/>
+  </g>
+
+  <g transform="translate(980 595) scale(0.9)">
+    <rect x="0" y="56" width="300" height="66" rx="20" fill="#111827"/>
+    <path d="M38 56 L88 18 L210 18 L262 56 Z" fill="#1f2937"/>
+    <rect x="94" y="26" width="62" height="24" rx="6" fill="#60a5fa"/>
+    <rect x="164" y="26" width="54" height="24" rx="6" fill="#60a5fa"/>
+    <circle cx="66" cy="130" r="24" fill="#020617"/>
+    <circle cx="234" cy="130" r="24" fill="#020617"/>
+    <circle cx="66" cy="130" r="12" fill="#9ca3af"/>
+    <circle cx="234" cy="130" r="12" fill="#9ca3af"/>
+    <rect x="-6" y="72" width="24" height="10" rx="5" fill="#f59e0b"/>
+  </g>
+</svg>

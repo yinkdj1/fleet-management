@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "../../../lib/api";
+import {
+  calculateBookingPricePreview,
+  DEFAULT_BOOKING_DISCOUNT_TIERS,
+  SERVICE_CHARGE_PER_DAY,
+  type BookingDiscountTier,
+} from "../../../lib/bookingPricing";
 import AppShell from "../../components/AppShell";
 
 type Customer = {
@@ -17,8 +23,17 @@ type Vehicle = {
   model: string;
   plateNumber: string;
   status: string;
+  usageType?: "personal" | "rideshare" | "both" | string;
+  description?: string;
   dailyRate: number;
 };
+
+function formatUsageTypeLabel(usageType?: string) {
+  const normalized = (usageType || "both").toLowerCase();
+  if (normalized === "personal") return "Personal";
+  if (normalized === "rideshare") return "Rideshare";
+  return "Personal/Rideshare";
+}
 
 type FieldErrors = Partial<Record<
   | "customerId"
@@ -29,27 +44,6 @@ type FieldErrors = Partial<Record<
   string
 >>;
 
-function roundToTwo(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function calculateRentalDays(pickupDatetime: string, returnDatetime: string) {
-  const pickup = new Date(pickupDatetime);
-  const dropoff = new Date(returnDatetime);
-
-  if (Number.isNaN(pickup.getTime()) || Number.isNaN(dropoff.getTime())) {
-    return 0;
-  }
-
-  const diffMs = dropoff.getTime() - pickup.getTime();
-
-  if (diffMs <= 0) {
-    return 0;
-  }
-
-  return Math.max(Math.ceil(diffMs / (1000 * 60 * 60 * 24)), 1);
-}
-
 export default function NewBookingPage() {
   const router = useRouter();
 
@@ -59,6 +53,9 @@ export default function NewBookingPage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [discountTiers, setDiscountTiers] = useState<BookingDiscountTier[]>(
+    DEFAULT_BOOKING_DISCOUNT_TIERS
+  );
 
   const [form, setForm] = useState({
     customerId: "",
@@ -69,6 +66,22 @@ export default function NewBookingPage() {
 
   useEffect(() => {
     fetchCustomers();
+  }, []);
+
+  useEffect(() => {
+    const fetchDiscountSettings = async () => {
+      try {
+        const res = await api.get("/dashboard/discount-settings");
+        const tiers = res.data?.data?.tiers;
+        if (Array.isArray(tiers) && tiers.length > 0) {
+          setDiscountTiers(tiers);
+        }
+      } catch {
+        setDiscountTiers(DEFAULT_BOOKING_DISCOUNT_TIERS);
+      }
+    };
+
+    fetchDiscountSettings();
   }, []);
 
   useEffect(() => {
@@ -90,27 +103,13 @@ export default function NewBookingPage() {
       return null;
     }
 
-    const days = calculateRentalDays(form.pickupDatetime, form.returnDatetime);
-
-    if (days <= 0) {
-      return null;
-    }
-
-    const dailyRate = Number(selectedVehicle.dailyRate || 0);
-    const subtotal = roundToTwo(dailyRate * days);
-const tax = roundToTwo(subtotal * 0.07);
-const deposit = 100;
-const total = roundToTwo(subtotal + tax + deposit);
-
-    return {
-      days,
-      dailyRate,
-      subtotal,
-      tax,
-      deposit,
-      total,
-    };
-  }, [selectedVehicle, form.pickupDatetime, form.returnDatetime]);
+    return calculateBookingPricePreview({
+      pickupDatetime: form.pickupDatetime,
+      returnDatetime: form.returnDatetime,
+      dailyRate: Number(selectedVehicle.dailyRate || 0),
+      discountTiers,
+    });
+  }, [discountTiers, selectedVehicle, form.pickupDatetime, form.returnDatetime]);
 
   const fetchCustomers = async () => {
     try {
@@ -334,7 +333,7 @@ const total = roundToTwo(subtotal + tax + deposit);
             </option>
             {availableVehicles.map((vehicle) => (
               <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.make} {vehicle.model} - {vehicle.plateNumber}
+                {vehicle.make} {vehicle.model} - {vehicle.plateNumber} ({formatUsageTypeLabel(vehicle.usageType)})
               </option>
             ))}
           </select>
@@ -356,6 +355,10 @@ const total = roundToTwo(subtotal + tax + deposit);
           <div className="p-4 border rounded bg-gray-50 space-y-2">
             <h2 className="font-semibold text-lg">Pricing Preview</h2>
 
+            {selectedVehicle.description && (
+              <p className="text-sm text-gray-700">{selectedVehicle.description}</p>
+            )}
+
             <div className="flex justify-between text-sm">
               <span>Daily Rate</span>
               <span>${pricingPreview.dailyRate.toFixed(2)}</span>
@@ -364,6 +367,23 @@ const total = roundToTwo(subtotal + tax + deposit);
             <div className="flex justify-between text-sm">
               <span>Rental Days</span>
               <span>{pricingPreview.days}</span>
+            </div>
+
+            <div className="flex justify-between text-sm">
+              <span>Rental ({pricingPreview.days} days)</span>
+              <span>${pricingPreview.rentalSubtotal.toFixed(2)}</span>
+            </div>
+
+            {pricingPreview.discountPercentage > 0 && (
+              <div className="flex justify-between text-sm text-green-700">
+                <span>Long booking discount ({pricingPreview.discountPercentage}%)</span>
+                <span>-${pricingPreview.rentalDiscount.toFixed(2)}</span>
+              </div>
+            )}
+
+            <div className="flex justify-between text-sm">
+              <span>Service Charge (${SERVICE_CHARGE_PER_DAY}/day)</span>
+              <span>${pricingPreview.serviceCharge.toFixed(2)}</span>
             </div>
 
             <div className="flex justify-between text-sm">
