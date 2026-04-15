@@ -15,9 +15,6 @@ export default function NewVehiclePage() {
     year: "",
     plateNumber: "",
     status: "available",
-    usageType: "both",
-    description: "",
-    dailyMileage: "",
     dailyRate: "",
     imageUrl: "",
   });
@@ -89,30 +86,6 @@ export default function NewVehiclePage() {
   <input
     name="dailyRate"
     placeholder="Daily Rate"
-    onChange={handleChange}
-    className="w-full p-3 border rounded"
-  />
-
-  <select
-    name="usageType"
-    value={form.usageType}
-    onChange={handleChange}
-    className="w-full p-3 border rounded"
-  >
-    <option value="both">Personal/Rideshare</option>
-    <option value="personal">Personal</option>
-    <option value="rideshare">Rideshare</option>
-  </select>
-  <textarea
-    name="description"
-    placeholder="Vehicle description"
-    onChange={handleChange}
-    className="w-full p-3 border rounded min-h-24"
-    maxLength={400}
-  />
-  <input
-    name="dailyMileage"
-    placeholder="Daily Mileage"
     onChange={handleChange}
     className="w-full p-3 border rounded"
   />

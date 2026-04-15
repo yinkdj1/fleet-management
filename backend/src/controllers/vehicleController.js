@@ -1,15 +1,5 @@
 const prisma = require("../config/db");
 const bookingService = require("../services/bookingService");
-const {
-  sanitizeUsageType,
-  ensureVehicleUsageSetting,
-  sanitizeVehicleDescription,
-  sanitizeVehicleText,
-  sanitizePassengers,
-  sanitizeDailyMileage,
-  updateVehicleProfile,
-  attachVehicleProfile,
-} = require("../services/vehicleUsageService");
 
 async function getVehicles(req, res, next) {
   try {
@@ -48,10 +38,8 @@ async function getVehicles(req, res, next) {
       prisma.vehicle.count({ where }),
     ]);
 
-    const dataWithUsage = await attachVehicleProfile(data);
-
     res.json({
-      data: dataWithUsage,
+      data,
       pagination: {
         total,
         page: pageNumber,
@@ -77,10 +65,7 @@ async function getVehicleById(req, res, next) {
       throw error;
     }
 
-    await ensureVehicleUsageSetting(vehicle.id);
-    const vehicleWithUsage = (await attachVehicleProfile([vehicle]))[0];
-
-    res.json({ data: vehicleWithUsage });
+    res.json({ data: vehicle });
   } catch (error) {
     next(error);
   }
@@ -88,23 +73,7 @@ async function getVehicleById(req, res, next) {
 
 async function createVehicle(req, res, next) {
   try {
-    const {
-      vin,
-      plateNumber,
-      make,
-      model,
-      year,
-      color,
-      mileage,
-      dailyRate,
-      status,
-      usageType,
-      description,
-      fuelType,
-      transmission,
-      passengers,
-      dailyMileage,
-    } = req.body;
+    const { vin, plateNumber, make, model, year, color, mileage, dailyRate, status } = req.body;
 
     if (!vin || !plateNumber || !make || !model || !year || !dailyRate) {
       const error = new Error("vin, plateNumber, make, model, year, and dailyRate are required");
@@ -126,17 +95,7 @@ async function createVehicle(req, res, next) {
       },
     });
 
-    await updateVehicleProfile(vehicle.id, {
-      usageType: sanitizeUsageType(usageType, "both"),
-      description: sanitizeVehicleDescription(description, ""),
-      fuelType: sanitizeVehicleText(fuelType, ""),
-      transmission: sanitizeVehicleText(transmission, ""),
-      passengers: sanitizePassengers(passengers, 0),
-      dailyMileage: sanitizeDailyMileage(dailyMileage, 0),
-    });
-    const vehicleWithUsage = (await attachVehicleProfile([vehicle]))[0];
-
-    res.status(201).json({ data: vehicleWithUsage });
+    res.status(201).json({ data: vehicle });
   } catch (error) {
     if (error.code === "P2002") {
       error.statusCode = 400;
@@ -148,23 +107,7 @@ async function createVehicle(req, res, next) {
 
 async function updateVehicle(req, res, next) {
   try {
-    const {
-      vin,
-      plateNumber,
-      make,
-      model,
-      year,
-      color,
-      mileage,
-      dailyRate,
-      status,
-      usageType,
-      description,
-      fuelType,
-      transmission,
-      passengers,
-      dailyMileage,
-    } = req.body;
+    const { vin, plateNumber, make, model, year, color, mileage, dailyRate, status } = req.body;
 
     const vehicle = await prisma.vehicle.update({
       where: { id: Number(req.params.id) },
@@ -181,47 +124,7 @@ async function updateVehicle(req, res, next) {
       },
     });
 
-    if (
-      usageType !== undefined ||
-      description !== undefined ||
-      fuelType !== undefined ||
-      transmission !== undefined ||
-      passengers !== undefined ||
-      dailyMileage !== undefined
-    ) {
-      await updateVehicleProfile(vehicle.id, {
-        usageType:
-          usageType !== undefined
-            ? sanitizeUsageType(usageType, "both")
-            : undefined,
-        description:
-          description !== undefined
-            ? sanitizeVehicleDescription(description, "")
-            : undefined,
-        fuelType:
-          fuelType !== undefined
-            ? sanitizeVehicleText(fuelType, "")
-            : undefined,
-        transmission:
-          transmission !== undefined
-            ? sanitizeVehicleText(transmission, "")
-            : undefined,
-        passengers:
-          passengers !== undefined
-            ? sanitizePassengers(passengers, 0)
-            : undefined,
-        dailyMileage:
-          dailyMileage !== undefined
-            ? sanitizeDailyMileage(dailyMileage, 0)
-            : undefined,
-      });
-    } else {
-      await ensureVehicleUsageSetting(vehicle.id);
-    }
-
-    const vehicleWithUsage = (await attachVehicleProfile([vehicle]))[0];
-
-    res.json({ data: vehicleWithUsage });
+    res.json({ data: vehicle });
   } catch (error) {
     if (error.code === "P2002") {
       error.statusCode = 400;
@@ -314,54 +217,13 @@ async function getAvailableVehicles(req, res, next) {
       orderBy: { createdAt: "desc" },
     });
 
-    const vehiclesWithUsage = await attachVehicleProfile(vehicles);
-
-    const availableVehicles = vehiclesWithUsage.map((vehicle) => ({
+    const availableVehicles = vehicles.map((vehicle) => ({
       ...vehicle,
       currentStatus: vehicle.status,
       status: "available",
     }));
 
     res.json({ data: availableVehicles });
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function uploadVehicleImage(req, res, next) {
-  try {
-    const vehicleId = Number(req.params.id);
-
-    if (!Number.isFinite(vehicleId) || vehicleId <= 0) {
-      const error = new Error("Invalid vehicle ID");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
-    if (!vehicle) {
-      const error = new Error("Vehicle not found");
-      error.statusCode = 404;
-      throw error;
-    }
-
-    if (!req.file) {
-      const error = new Error("No image file provided");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (!ALLOWED_TYPES.includes(req.file.mimetype)) {
-      const error = new Error("Invalid file type. Only JPEG, PNG, and WebP are allowed.");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const imageUrl = `/uploads/${req.file.filename}`;
-    await updateVehicleProfile(vehicleId, { imageUrl });
-
-    res.json({ data: { imageUrl } });
   } catch (error) {
     next(error);
   }
@@ -375,5 +237,4 @@ module.exports = {
   deleteVehicle,
   checkVehicleAvailability,
   getAvailableVehicles,
-  uploadVehicleImage,
 };

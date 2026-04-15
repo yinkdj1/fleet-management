@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import api from "../../../lib/api";
-import { formatBookingId } from "../../../lib/bookingId";
 
 type BookingInfo = {
   id: number;
@@ -164,7 +163,7 @@ export default function GuestManageBookingPage() {
 
         {booking && (
           <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-2">
-            <p className="text-sm text-zinc-700">Booking {formatBookingId(booking.id)}</p>
+            <p className="text-sm text-zinc-700">Booking #{booking.id}</p>
             <p className="text-sm text-zinc-700">Status: <span className="font-semibold">{booking.status}</span></p>
             <p className="text-sm text-zinc-700">
               Vehicle: {booking.vehicle?.make} {booking.vehicle?.model} ({booking.vehicle?.plateNumber})

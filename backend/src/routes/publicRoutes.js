@@ -12,7 +12,6 @@ const {
   getPublicManageBooking,
   modifyPublicManageBooking,
   cancelPublicManageBooking,
-  getPublicDiscountSettings,
   getPublicGeocodeSearch,
   getPublicGeocodeReverse,
   createTestPayment,
@@ -45,7 +44,6 @@ const paymentRateLimiter = createRateLimiter({
 });
 
 router.get("/vehicles/available", vehiclesRateLimiter, getPublicAvailableVehicles);
-router.get("/discount-settings", vehiclesRateLimiter, getPublicDiscountSettings);
 router.get("/customers/lookup", vehiclesRateLimiter, getPublicCustomerByContact);
 router.get("/bookings/:id", vehiclesRateLimiter, getPublicGuestBooking);
 router.get("/precheckout/:token", vehiclesRateLimiter, getPublicPrecheckoutBooking);

@@ -2,17 +2,6 @@ require("dotenv").config();
 const app = require("./app");
 const bookingService = require("./services/bookingService");
 
-if (!process.env.JWT_SECRET) {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("JWT_SECRET must be defined in production");
-  }
-
-  process.env.JWT_SECRET = "dev-jwt-secret-change-me";
-  console.warn(
-    "JWT_SECRET was not set. Using a development fallback secret."
-  );
-}
-
 const PORT = process.env.PORT || 5000;
 const AUTO_PRECHECKOUT_ENABLED = process.env.PRECHECKOUT_AUTO_ENABLED !== "false";
 const AUTO_PRECHECKOUT_INTERVAL_MS =

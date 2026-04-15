@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import api from "../../../lib/api";
-import { formatBookingId } from "../../../lib/bookingId";
 
 type BookingSummary = {
   id: number;
@@ -279,7 +278,7 @@ export default function GuestBookingWorkflowPage() {
 
         {booking && (
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm space-y-3">
-            <p className="text-sm text-zinc-700">Booking ID: {formatBookingId(booking.id)}</p>
+            <p className="text-sm text-zinc-700">Booking ID: #{booking.id}</p>
             <p className="text-sm text-zinc-700">Status: <span className="font-semibold">{booking.status}</span></p>
             <p className="text-sm text-zinc-700">
               Vehicle: {booking.vehicle?.make} {booking.vehicle?.model} ({booking.vehicle?.plateNumber})

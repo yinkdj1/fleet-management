@@ -1,7 +1,6 @@
 const bookingService = require("../services/bookingService");
 const { getAvailableVehicles } = require("./vehicleController");
 const paymentGateway = require("../services/paymentGateway");
-const { getDiscountSettings } = require("../services/discountSettingsService");
 
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org";
 const NOMINATIM_HEADERS = {
@@ -301,15 +300,6 @@ async function createPublicReservation(req, res, next) {
   }
 }
 
-async function getPublicDiscountSettings(req, res, next) {
-  try {
-    const settings = await getDiscountSettings();
-    res.json({ data: settings });
-  } catch (error) {
-    next(error);
-  }
-}
-
 async function createTestPayment(req, res, next) {
   try {
     const payment = paymentGateway.charge(req.body);
@@ -331,7 +321,6 @@ module.exports = {
   getPublicManageBooking,
   modifyPublicManageBooking,
   cancelPublicManageBooking,
-  getPublicDiscountSettings,
   getPublicGeocodeSearch,
   getPublicGeocodeReverse,
   createTestPayment,

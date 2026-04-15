@@ -17,38 +17,6 @@ function verifyPassword(password, storedHash) {
   return crypto.timingSafeEqual(Buffer.from(key, "hex"), Buffer.from(derivedKey, "hex"));
 }
 
-async function ensureDevAdminUser(email, password) {
-  const isDev = process.env.NODE_ENV !== "production";
-  const isDefaultAdmin = email === "admin@example.com" && password === "Password123";
-
-  if (!isDev || !isDefaultAdmin) {
-    return null;
-  }
-
-  const passwordHash = hashPassword(password);
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-
-  if (existingUser) {
-    return prisma.user.update({
-      where: { email },
-      data: {
-        name: existingUser.name || "Admin User",
-        role: existingUser.role || "admin",
-        passwordHash,
-      },
-    });
-  }
-
-  return prisma.user.create({
-    data: {
-      name: "Admin User",
-      email,
-      role: "admin",
-      passwordHash,
-    },
-  });
-}
-
 async function register(req, res, next) {
   try {
     const { name, email, password, role } = req.body;
@@ -107,16 +75,9 @@ async function login(req, res, next) {
       throw error;
     }
 
-    let user = await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email },
     });
-
-    if (!user || !verifyPassword(password, user.passwordHash)) {
-      const devAdminUser = await ensureDevAdminUser(email, password);
-      if (devAdminUser) {
-        user = devAdminUser;
-      }
-    }
 
     if (!user || !verifyPassword(password, user.passwordHash)) {
       const error = new Error("Invalid email or password");
