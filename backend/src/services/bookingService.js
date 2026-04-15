@@ -15,6 +15,7 @@ const {
   reevaluateVehicleStatus,
 } = require("./vehicleStatusService");
 const { hasSmtpConfig, sendEmail } = require("./emailService");
+const { getDiscountSettings } = require("./discountSettingsService");
 const twilio = require("twilio");
 
 const SERVICE_CHARGE_DAILY = 15;
@@ -145,13 +146,35 @@ function calculateRentalDays(pickupDatetime, returnDatetime) {
   return Math.max(days, 1);
 }
 
-function calculateBookingAmounts({ pickupDatetime, returnDatetime, vehicle }) {
+async function getBookingDiscountForDays(days) {
+  const settings = await getDiscountSettings();
+  const matchingTier = settings.tiers.find(
+    (tier) => days >= tier.minDays && Number(tier.percentage) > 0
+  );
+
+  if (!matchingTier) {
+    return {
+      percentage: 0,
+      decimalRate: 0,
+    };
+  }
+
+  return {
+    percentage: matchingTier.percentage,
+    decimalRate: matchingTier.percentage / 100,
+  };
+}
+
+async function calculateBookingAmounts({ pickupDatetime, returnDatetime, vehicle }) {
   const days = calculateRentalDays(pickupDatetime, returnDatetime);
   const dailyRate = getVehicleDailyRate(vehicle);
+  const discount = await getBookingDiscountForDays(days);
 
   const rentalSubtotal = roundToTwo(dailyRate * days);
+  const rentalDiscount = roundToTwo(rentalSubtotal * discount.decimalRate);
+  const discountedRentalSubtotal = roundToTwo(rentalSubtotal - rentalDiscount);
   const serviceCharge = roundToTwo(SERVICE_CHARGE_DAILY * days);
-  const subtotal = roundToTwo(rentalSubtotal + serviceCharge);
+  const subtotal = roundToTwo(discountedRentalSubtotal + serviceCharge);
   const tax = roundToTwo(subtotal * 0.07);
   const deposit = 100;
   const totalAmount = roundToTwo(subtotal + tax + deposit);
@@ -160,6 +183,9 @@ function calculateBookingAmounts({ pickupDatetime, returnDatetime, vehicle }) {
     days,
     dailyRate,
     rentalSubtotal,
+    rentalDiscount,
+    discountedRentalSubtotal,
+    discountPercentage: discount.percentage,
     serviceCharge,
     subtotal,
     tax,
@@ -351,7 +377,7 @@ async function createBooking(data) {
     data.returnDatetime
   );
 
-  const pricing = calculateBookingAmounts({
+  const pricing = await calculateBookingAmounts({
     pickupDatetime: data.pickupDatetime,
     returnDatetime: data.returnDatetime,
     vehicle,
@@ -383,6 +409,15 @@ async function createBooking(data) {
     pricing: {
       days: pricing.days,
       dailyRate: pricing.dailyRate,
+      rentalSubtotal: pricing.rentalSubtotal,
+      rentalDiscount: pricing.rentalDiscount,
+      discountedRentalSubtotal: pricing.discountedRentalSubtotal,
+      discountPercentage: pricing.discountPercentage,
+      serviceCharge: pricing.serviceCharge,
+      subtotal: pricing.subtotal,
+      tax: pricing.tax,
+      deposit: pricing.deposit,
+      totalAmount: pricing.totalAmount,
     },
   };
 }
@@ -718,6 +753,113 @@ async function sendReservationConfirmationEmail(booking) {
   }
 }
 
+async function sendReservationConfirmationSms(booking) {
+  const normalizedPhone = normalizePhone(booking?.customer?.phone);
+
+  if (!normalizedPhone) {
+    return {
+      sent: false,
+      reason: "guest_phone_missing",
+      message: "Reservation created, but guest phone is missing.",
+      links: null,
+    };
+  }
+
+  const links = buildGuestManageLinks(booking);
+  const vehicleLabel = `${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""}`.trim();
+  const plateNumber = booking.vehicle?.plateNumber || "N/A";
+  const pickupDisplay = formatDateTimeForEmail(booking.pickupDatetime);
+  const returnDisplay = formatDateTimeForEmail(booking.returnDatetime);
+
+  const smsBody = [
+    `Carsgidi booking #${booking.id} is confirmed.`,
+    `${vehicleLabel} (${plateNumber})`,
+    `Pickup: ${pickupDisplay}`,
+    `Return: ${returnDisplay}`,
+    `Manage: ${links.manageUrl}`,
+  ].join(" ");
+
+  let twilioAttempted = false;
+  let twilioFailed = false;
+
+  if (hasTwilioSmsConfig()) {
+    twilioAttempted = true;
+    try {
+      const client = getTwilioClient();
+      const response = await client.messages.create({
+        to: normalizedPhone,
+        from: process.env.TWILIO_FROM_NUMBER,
+        body: smsBody,
+      });
+
+      if (response?.sid) {
+        return {
+          sent: true,
+          reason: "sent_twilio",
+          message: "Booking confirmation SMS sent.",
+          links,
+        };
+      }
+    } catch {
+      twilioFailed = true;
+    }
+  }
+
+  const smsWebhookUrl =
+    process.env.RESERVATION_SMS_WEBHOOK_URL ||
+    process.env.PRECHECKOUT_SMS_WEBHOOK_URL;
+
+  if (!smsWebhookUrl) {
+    if (twilioAttempted && twilioFailed) {
+      return {
+        sent: false,
+        reason: "twilio_failed_no_webhook",
+        message: "Reservation created, but confirmation SMS failed.",
+        links,
+      };
+    }
+
+    return {
+      sent: false,
+      reason: "sms_not_configured",
+      message: "Reservation created, but SMS provider is not configured.",
+      links,
+    };
+  }
+
+  try {
+    const response = await fetch(smsWebhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        to: normalizedPhone,
+        message: smsBody,
+        bookingId: booking.id,
+      }),
+    });
+
+    return {
+      sent: response.ok,
+      reason: response.ok ? "sent_webhook" : "webhook_failed",
+      message: response.ok
+        ? twilioFailed
+          ? "Twilio failed; booking confirmation SMS sent via webhook."
+          : "Booking confirmation SMS sent."
+        : "Reservation created, but confirmation SMS failed.",
+      links,
+    };
+  } catch {
+    return {
+      sent: false,
+      reason: twilioFailed ? "twilio_and_webhook_failed" : "webhook_error",
+      message: "Reservation created, but confirmation SMS failed.",
+      links,
+    };
+  }
+}
+
 async function sendReservationCancellationEmail(booking) {
   const email = normalizeEmail(booking?.customer?.email);
 
@@ -822,6 +964,7 @@ async function createPublicReservation(data) {
   });
 
   const confirmation = await sendReservationConfirmationEmail(booking);
+  const confirmationSms = await sendReservationConfirmationSms(booking);
 
   return {
     ...booking,
@@ -829,6 +972,11 @@ async function createPublicReservation(data) {
       sent: confirmation.sent,
       message: confirmation.message,
       links: confirmation.links,
+    },
+    confirmationSms: {
+      sent: confirmationSms.sent,
+      message: confirmationSms.message,
+      links: confirmationSms.links,
     },
   };
 }
@@ -1445,10 +1593,17 @@ async function extendBookingPublic(id, data = {}, guest = {}) {
   const currentReturn = new Date(booking.returnDatetime);
   const extensionDays = calculateRentalDays(currentReturn, nextReturn);
   const dailyRate = getVehicleDailyRate(vehicle);
+  const discount = await getBookingDiscountForDays(extensionDays);
   const extensionRentalSubtotal = roundToTwo(dailyRate * extensionDays);
+  const extensionRentalDiscount = roundToTwo(
+    extensionRentalSubtotal * discount.decimalRate
+  );
+  const extensionDiscountedRentalSubtotal = roundToTwo(
+    extensionRentalSubtotal - extensionRentalDiscount
+  );
   const extensionServiceCharge = roundToTwo(SERVICE_CHARGE_DAILY * extensionDays);
   const extensionSubtotal = roundToTwo(
-    extensionRentalSubtotal + extensionServiceCharge
+    extensionDiscountedRentalSubtotal + extensionServiceCharge
   );
   const extensionTax = roundToTwo(extensionSubtotal * 0.07);
   const extensionTotal = roundToTwo(extensionSubtotal + extensionTax);
@@ -1480,6 +1635,9 @@ async function extendBookingPublic(id, data = {}, guest = {}) {
       days: extensionDays,
       dailyRate,
       rentalSubtotal: extensionRentalSubtotal,
+      rentalDiscount: extensionRentalDiscount,
+      discountedRentalSubtotal: extensionDiscountedRentalSubtotal,
+      discountPercentage: discount.percentage,
       serviceCharge: extensionServiceCharge,
       subtotal: extensionSubtotal,
       tax: extensionTax,
@@ -1524,7 +1682,7 @@ async function updateBooking(id, data) {
     existingBooking.id
   );
 
-  const pricing = calculateBookingAmounts({
+  const pricing = await calculateBookingAmounts({
     pickupDatetime: nextPickup,
     returnDatetime: nextReturn,
     vehicle,
@@ -1562,6 +1720,15 @@ async function updateBooking(id, data) {
     pricing: {
       days: pricing.days,
       dailyRate: pricing.dailyRate,
+      rentalSubtotal: pricing.rentalSubtotal,
+      rentalDiscount: pricing.rentalDiscount,
+      discountedRentalSubtotal: pricing.discountedRentalSubtotal,
+      discountPercentage: pricing.discountPercentage,
+      serviceCharge: pricing.serviceCharge,
+      subtotal: pricing.subtotal,
+      tax: pricing.tax,
+      deposit: pricing.deposit,
+      totalAmount: pricing.totalAmount,
     },
   };
 }
@@ -1587,7 +1754,7 @@ async function rescheduleBooking(id, data) {
 
   const vehicle = await ensureVehicleExists(booking.vehicleId);
 
-  const pricing = calculateBookingAmounts({
+  const pricing = await calculateBookingAmounts({
     pickupDatetime: data.pickupDatetime,
     returnDatetime: data.returnDatetime,
     vehicle,
