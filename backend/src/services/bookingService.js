@@ -273,7 +273,13 @@ async function getBookings(filters = {}) {
 
   const where = {};
 
-  if (status) where.status = status;
+  if (status) {
+    if (status === "other") {
+      where.status = { notIn: ["active", "completed"] };
+    } else {
+      where.status = status;
+    }
+  }
   if (customerId) where.customerId = Number(customerId);
   if (vehicleId) where.vehicleId = Number(vehicleId);
 
