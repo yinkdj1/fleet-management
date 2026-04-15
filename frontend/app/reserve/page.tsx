@@ -77,6 +77,24 @@ type PaymentForm = {
   cvv: string;
 };
 
+type ConfirmationDetails = {
+  bookingId: number;
+  firstName: string;
+  lastName: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  vehiclePlate: string;
+  pickupDatetime: string;
+  returnDatetime: string;
+  pickupLocation: string;
+  total: number;
+  paymentReference: string;
+  emailMessage?: string;
+  smsMessage?: string;
+  deletionToken?: string;
+  manageToken?: string;
+};
+
 type TermsChecks = {
   accuracy: boolean;
   agreement: boolean;
@@ -244,6 +262,17 @@ function getDefaultReturnDatetime(pickupDatetime: string) {
   return formatDatetimeLocal(nextDay);
 }
 
+function getMinimumReturnDatetime(pickupDatetime: string) {
+  const pickup = new Date(pickupDatetime);
+  if (Number.isNaN(pickup.getTime())) {
+    return "";
+  }
+
+  const minimum = new Date(pickup);
+  minimum.setHours(minimum.getHours() + 24);
+  return formatDatetimeLocal(minimum);
+}
+
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
@@ -404,7 +433,10 @@ export default function ReservePage() {
   const [rentalThemeClass, setRentalThemeClass] = useState("reserve-rental-bg-day");
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [confirmationDetails, setConfirmationDetails] = useState<ConfirmationDetails | null>(null);
+  const [cancelConfirmStep, setCancelConfirmStep] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -533,6 +565,10 @@ export default function ReservePage() {
 
   const isNightTheme = rentalThemeClass === "reserve-rental-bg-night";
 
+  const handleThemeModeChange = (mode: "auto" | "day" | "night") => {
+    setThemeMode(mode);
+  };
+
   useEffect(() => {
     if (!form.pickupDatetime || !form.returnDatetime) {
       setVehicles([]);
@@ -544,7 +580,15 @@ export default function ReservePage() {
     const fetchVehicles = async () => {
       setError("");
       if (new Date(form.returnDatetime) <= new Date(form.pickupDatetime)) {
-        setError("Return date/time must be after pickup date/time");
+        setError("Return date/time must be at least 24 hours after pickup date/time");
+        setVehicles([]);
+        setForm((prev) => ({ ...prev, vehicleId: "" }));
+        return;
+      }
+
+      const minimumReturn = getMinimumReturnDatetime(form.pickupDatetime);
+      if (minimumReturn && new Date(form.returnDatetime) < new Date(minimumReturn)) {
+        setError("Return date/time must be at least 24 hours after pickup date/time");
         setVehicles([]);
         setForm((prev) => ({ ...prev, vehicleId: "" }));
         return;
@@ -654,7 +698,7 @@ export default function ReservePage() {
           nextForm.returnDatetime = "";
         } else if (
           !prev.returnDatetime ||
-          new Date(prev.returnDatetime) <= new Date(value)
+          new Date(prev.returnDatetime) < new Date(getMinimumReturnDatetime(value))
         ) {
           nextForm.returnDatetime = getDefaultReturnDatetime(value);
         }
@@ -687,7 +731,6 @@ export default function ReservePage() {
     }
 
     if (error) setError("");
-    if (success) setSuccess("");
   };
 
   const handlePaymentInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -757,11 +800,16 @@ export default function ReservePage() {
       setLookupInFlight(true);
       setLookupMessage("");
 
+      // Only search by the field that was just blurred — never mix email + phone
+      // in the lookup. This prevents Virgil's phone (or any previously-entered
+      // contact info) from matching a completely different new customer.
+      const lookupParams =
+        name === "email"
+          ? { email: email || undefined }
+          : { phone: normalizedPhone || undefined };
+
       const res = await api.get("/public/customers/lookup", {
-        params: {
-          email: email || undefined,
-          phone: normalizedPhone || undefined,
-        },
+        params: lookupParams,
       });
 
       const existing: ExistingCustomer | null = res.data?.data || null;
@@ -772,8 +820,10 @@ export default function ReservePage() {
 
       setForm((prev) => ({
         ...prev,
-        firstName: existing.firstName || prev.firstName,
-        lastName: existing.lastName || prev.lastName,
+        // Preserve whatever the user already typed for name fields; only
+        // fall back to the stored name if the field is still empty.
+        firstName: prev.firstName.trim() || existing.firstName || prev.firstName,
+        lastName: prev.lastName.trim() || existing.lastName || prev.lastName,
         email: existing.email || prev.email,
         phone: existing.phone || prev.phone,
         addressLine: existing.addressLine || prev.addressLine,
@@ -795,7 +845,7 @@ export default function ReservePage() {
         dateOfBirth: "",
       }));
 
-      setLookupMessage("Existing customer details loaded.");
+      setLookupMessage("Returning customer — details pre-filled. Update any fields that have changed.");
     } catch {
       setLookupMessage("");
     } finally {
@@ -862,7 +912,6 @@ export default function ReservePage() {
     }));
     setShowVehicleList(false);
     if (error) setError("");
-    if (success) setSuccess("");
   };
 
   const pushChatMessage = (role: "bot" | "user", text: string) => {
@@ -948,9 +997,9 @@ export default function ReservePage() {
     if (
       form.pickupDatetime &&
       form.returnDatetime &&
-      new Date(form.returnDatetime) <= new Date(form.pickupDatetime)
+      new Date(form.returnDatetime) < new Date(getMinimumReturnDatetime(form.pickupDatetime))
     ) {
-      errors.returnDatetime = "Return date/time must be after pickup date/time";
+      errors.returnDatetime = "Return date/time must be at least 24 hours after pickup date/time";
     }
 
     return errors;
@@ -959,7 +1008,6 @@ export default function ReservePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setSuccess("");
     setFieldErrors({});
 
     const clientErrors = validateClientSide();
@@ -1017,33 +1065,50 @@ export default function ReservePage() {
       const bookingId = res.data?.data?.id;
       const confirmationEmailMessage = res.data?.data?.confirmationEmail?.message;
       const confirmationSmsMessage = res.data?.data?.confirmationSms?.message;
-      setSuccess(
-        bookingId
-          ? `Reservation submitted. Your booking ID is #${bookingId}.${
-              confirmationEmailMessage ? ` ${confirmationEmailMessage}` : ""
-            }${
-              confirmationSmsMessage ? ` ${confirmationSmsMessage}` : ""
-            }`
-          : "Reservation submitted successfully."
-      );
+      const deletionToken = res.data?.data?.deletionToken as string | undefined;
+      const manageToken = res.data?.data?.manageToken as string | undefined;
+
+      if (bookingId && selectedVehicle && pricePreview) {
+        setConfirmationDetails({
+          bookingId,
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          vehicleMake: selectedVehicle.make,
+          vehicleModel: selectedVehicle.model,
+          vehiclePlate: selectedVehicle.plateNumber,
+          pickupDatetime: form.pickupDatetime,
+          returnDatetime: form.returnDatetime,
+          pickupLocation,
+          total: pricePreview.total,
+          paymentReference: form.paymentReference.trim(),
+          emailMessage: confirmationEmailMessage,
+          smsMessage: confirmationSmsMessage,
+          deletionToken,
+          manageToken,
+        });
+      }
 
       setForm({
-        firstName: form.firstName,
-        lastName: form.lastName,
-        email: form.email,
-        phone: form.phone,
-        addressLine: form.addressLine,
-        city: form.city,
-        state: form.state,
-        zip: form.zip,
-        driversLicenseNo: form.driversLicenseNo,
-        dateOfBirth: form.dateOfBirth,
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        addressLine: "",
+        city: "",
+        state: "",
+        zip: "",
+        driversLicenseNo: "",
+        dateOfBirth: "",
         pickupDatetime: "",
         returnDatetime: "",
         vehicleId: "",
         paymentReference: "",
         paymentConfirmed: false,
       });
+      setPaymentForm({ cardholderName: "", cardNumber: "", expiry: "", cvv: "" });
+      setTermsChecks({ accuracy: false, agreement: false, authorization: false, esign: false });
+      setLookupMessage("");
+      setPaymentMessage("");
       setVehicles([]);
     } catch (err: unknown) {
       const responseErrors =
@@ -1085,47 +1150,53 @@ export default function ReservePage() {
             }`}
           />
 
-          <div className={`flex items-center gap-1 rounded-full border p-1 text-xs font-semibold shadow-[0_12px_30px_-20px_rgba(146,64,14,0.5)] ${
+          <div className={`pointer-events-auto flex items-center gap-1 rounded-full border p-1 text-xs font-semibold shadow-[0_12px_30px_-20px_rgba(146,64,14,0.5)] ${
             isNightTheme
               ? "border-slate-300/25 bg-white/15 text-slate-100"
               : "border-amber-900/20 bg-white/80 text-zinc-700"
           }`}>
             <button
               type="button"
-              onClick={() => setThemeMode("auto")}
+              onClick={() => handleThemeModeChange("auto")}
+              onTouchStart={() => handleThemeModeChange("auto")}
+              aria-pressed={themeMode === "auto"}
               className={`rounded-full px-3 py-1 transition ${
                 themeMode === "auto"
                   ? "bg-[var(--color-accent)] text-zinc-900"
                   : isNightTheme
                     ? "hover:bg-white/15"
                     : "hover:bg-amber-50"
-              }`}
+              } touch-manipulation`}
             >
               Auto
             </button>
             <button
               type="button"
-              onClick={() => setThemeMode("day")}
+              onClick={() => handleThemeModeChange("day")}
+              onTouchStart={() => handleThemeModeChange("day")}
+              aria-pressed={themeMode === "day"}
               className={`rounded-full px-3 py-1 transition ${
                 themeMode === "day"
                   ? "bg-[var(--color-accent)] text-zinc-900"
                   : isNightTheme
                     ? "hover:bg-white/15"
                     : "hover:bg-amber-50"
-              }`}
+              } touch-manipulation`}
             >
               Day
             </button>
             <button
               type="button"
-              onClick={() => setThemeMode("night")}
+              onClick={() => handleThemeModeChange("night")}
+              onTouchStart={() => handleThemeModeChange("night")}
+              aria-pressed={themeMode === "night"}
               className={`rounded-full px-3 py-1 transition ${
                 themeMode === "night"
                   ? "bg-[var(--color-accent)] text-zinc-900"
                   : isNightTheme
                     ? "hover:bg-white/15"
                     : "hover:bg-amber-50"
-              }`}
+              } touch-manipulation`}
             >
               Night
             </button>
@@ -1199,61 +1270,7 @@ export default function ReservePage() {
             : "border-amber-900/15 bg-[linear-gradient(158deg,rgba(255,251,244,0.95),rgba(248,239,224,0.93))]"
         }`}>
           <form onSubmit={handleSubmit} className="mt-6 sm:mt-8 space-y-6">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.95fr]">
-              <div className="float-soft-delayed rounded-3xl border border-amber-300/20 bg-white/5 p-4 sm:p-5">
-                <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${isNightTheme ? "text-amber-300" : "text-[var(--color-accent-deep)]"}`}>Carsgidi</p>
-                <h1 className={`mt-3 text-3xl font-black leading-tight sm:text-4xl ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>Find. Book. Drive</h1>
-                <p className={`mt-4 max-w-2xl leading-relaxed ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}>
-                  Reserve your ride in minutes. Book clean, reliable vehicles with transparent pricing and instant confirmation.
-                </p>
-
-                <div className="mt-5 flex flex-wrap gap-2 text-sm font-semibold">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/45 bg-white/75 px-3 py-1.5 text-zinc-800">
-                    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-amber-600" aria-hidden="true">
-                      <path d="M4 10.5 8 14l8-8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Flexible
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/45 bg-white/75 px-3 py-1.5 text-zinc-800">
-                    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-sky-600" aria-hidden="true">
-                      <path d="M10 3v7l4 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.6" />
-                    </svg>
-                    Instant
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/45 bg-white/75 px-3 py-1.5 text-zinc-800">
-                    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-emerald-600" aria-hidden="true">
-                      <path d="M3 11.5h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      <path d="M6 11.5V9.8a2.8 2.8 0 0 1 2.8-2.8h2.4A2.8 2.8 0 0 1 14 9.8v1.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      <circle cx="6" cy="13.8" r="1.2" fill="currentColor" />
-                      <circle cx="14" cy="13.8" r="1.2" fill="currentColor" />
-                    </svg>
-                    Road-ready
-                  </span>
-                </div>
-
-                <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <article className={`flex min-h-[132px] flex-col justify-center rounded-2xl border px-5 py-5 ${
-                    isNightTheme ? "border-slate-200/20 bg-white/10" : "border-amber-900/15 bg-white/75"
-                  }`}>
-                    <p className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>200+</p>
-                    <p className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}>Trips completed</p>
-                  </article>
-                  <article className={`flex min-h-[132px] flex-col justify-center rounded-2xl border px-5 py-5 ${
-                    isNightTheme ? "border-slate-200/20 bg-white/10" : "border-amber-900/15 bg-white/75"
-                  }`}>
-                    <p className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>24/7</p>
-                    <p className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}>Customer Support</p>
-                  </article>
-                  <article className={`flex min-h-[132px] flex-col justify-center rounded-2xl border px-5 py-5 ${
-                    isNightTheme ? "border-slate-200/20 bg-white/10" : "border-amber-900/15 bg-white/75"
-                  }`}>
-                    <p className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>10+</p>
-                    <p className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}>vehicle in fleet</p>
-                  </article>
-                </div>
-              </div>
-
+            <div className="grid grid-cols-1 gap-6">
               <aside className="relative rounded-2xl border border-amber-300/35 bg-white/80 p-4 shadow-[0_20px_44px_-30px_rgba(21,94,117,0.55)]">
                 <div className="pointer-events-none absolute -inset-2 -z-10 rounded-3xl bg-[radial-gradient(circle_at_70%_20%,rgba(245,191,98,0.42),transparent_55%),radial-gradient(circle_at_25%_80%,rgba(109,211,220,0.34),transparent_58%)] blur-xl" />
                 <h2 className="text-base font-semibold text-zinc-900">Reservation Card</h2>
@@ -1286,7 +1303,7 @@ export default function ReservePage() {
                       name="returnDatetime"
                       value={form.returnDatetime}
                       onChange={handleChange}
-                      min={form.pickupDatetime || undefined}
+                      min={form.pickupDatetime ? getMinimumReturnDatetime(form.pickupDatetime) : undefined}
                       className="form-input-modern w-full rounded-xl p-3 text-zinc-900"
                       required
                     />
@@ -1798,7 +1815,6 @@ export default function ReservePage() {
             </div>
 
             {error && <p className="md:col-span-2 xl:col-span-4 text-sm text-red-700">{error}</p>}
-            {success && <p className="md:col-span-2 xl:col-span-4 text-sm text-green-700">{success}</p>}
           </form>
         </section>
 
@@ -1869,7 +1885,107 @@ export default function ReservePage() {
         </section>
       </div>
 
-      <footer className={`fixed bottom-0 left-0 right-0 z-40 border-t px-3 py-2.5 text-center text-xs backdrop-blur-xl sm:px-4 sm:py-3 sm:text-sm ${
+      <section
+        className={`mx-auto mt-6 w-full max-w-7xl rounded-3xl border p-5 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:p-6 ${
+          isNightTheme
+            ? "border-slate-200/20 bg-[rgba(15,24,41,0.78)]"
+            : "border-amber-900/15 bg-white/80"
+        }`}
+      >
+        <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${isNightTheme ? "text-amber-300" : "text-[var(--color-accent-deep)]"}`}>
+          Carsgidi
+        </p>
+        <h2 className={`mt-3 text-3xl font-black leading-tight sm:text-4xl ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+          Find. Book. Drive
+        </h2>
+        <p className={`mt-4 max-w-2xl leading-relaxed ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}>
+          Reserve your ride in minutes. Book clean, reliable vehicles with transparent pricing and instant confirmation.
+        </p>
+
+        <div className="mt-5 flex flex-wrap gap-2 text-sm font-semibold">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 ${
+              isNightTheme
+                ? "border-amber-300/35 bg-amber-300/12 text-amber-100"
+                : "border-amber-300/45 bg-white/75 text-zinc-800"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-amber-500" aria-hidden="true">
+              <path d="M5 12.5 9.5 17 19 7.5" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Flexible
+          </span>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 ${
+              isNightTheme
+                ? "border-sky-300/35 bg-sky-300/12 text-sky-100"
+                : "border-sky-300/45 bg-white/75 text-zinc-800"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-sky-500" aria-hidden="true">
+              <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
+              <path d="M12 8v4l2.8 1.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Instant
+          </span>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 ${
+              isNightTheme
+                ? "border-emerald-300/35 bg-emerald-300/12 text-emerald-100"
+                : "border-emerald-300/45 bg-white/75 text-zinc-800"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-emerald-500" aria-hidden="true">
+              <path d="M3.5 14h17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M7 14v-1.8A3.2 3.2 0 0 1 10.2 9h3.6A3.2 3.2 0 0 1 17 12.2V14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="7.5" cy="16.5" r="1.3" fill="currentColor" />
+              <circle cx="16.5" cy="16.5" r="1.3" fill="currentColor" />
+            </svg>
+            Road Ready
+          </span>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <article
+            className={`flex min-h-[120px] flex-col justify-center rounded-2xl border px-5 py-4 ${
+              isNightTheme ? "border-slate-200/20 bg-white/10" : "border-amber-900/15 bg-white/75"
+            }`}
+          >
+            <p className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+              200+
+            </p>
+            <p className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}>
+              Trips Completed
+            </p>
+          </article>
+          <article
+            className={`flex min-h-[120px] flex-col justify-center rounded-2xl border px-5 py-4 ${
+              isNightTheme ? "border-slate-200/20 bg-white/10" : "border-amber-900/15 bg-white/75"
+            }`}
+          >
+            <p className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+              24/7
+            </p>
+            <p className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}>
+              Customer Support
+            </p>
+          </article>
+          <article
+            className={`flex min-h-[120px] flex-col justify-center rounded-2xl border px-5 py-4 ${
+              isNightTheme ? "border-slate-200/20 bg-white/10" : "border-amber-900/15 bg-white/75"
+            }`}
+          >
+            <p className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+              10+
+            </p>
+            <p className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}>
+              Vehicles in Fleet
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <footer className={`relative mt-6 border-t px-3 py-2.5 text-center text-xs backdrop-blur-xl sm:fixed sm:bottom-0 sm:left-0 sm:right-0 sm:z-40 sm:px-4 sm:py-3 sm:text-sm ${
         isNightTheme
           ? "border-slate-300/20 bg-[rgba(10,16,30,0.88)] text-slate-100"
           : "border-amber-900/15 bg-[rgba(255,248,237,0.94)] text-zinc-900"
@@ -1886,6 +2002,154 @@ export default function ReservePage() {
           </div>
         </div>
       </footer>
+
+      {confirmationDetails && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-modal-title"
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (!cancelling) { setConfirmationDetails(null); setCancelConfirmStep(false); setCancelError(""); } }} />
+          <div className="relative w-full max-w-md overflow-y-auto max-h-[90vh] rounded-3xl border border-emerald-300/50 bg-white p-6 shadow-[0_32px_80px_-24px_rgba(0,0,0,0.55)] sm:p-8">
+
+            {/* Header */}
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6 text-emerald-600" aria-hidden="true">
+                  <path d="M5 12.5 9.5 17 19 7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div>
+                <h2 id="confirm-modal-title" className="text-lg font-bold text-zinc-900">Reservation Confirmed</h2>
+                <p className="text-sm text-zinc-500">Booking #{confirmationDetails.bookingId}</p>
+              </div>
+            </div>
+
+            {/* Details */}
+            <div className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Trip ID</span>
+                <span className="font-mono font-semibold text-zinc-900">#{confirmationDetails.bookingId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Guest</span>
+                <span className="font-medium text-zinc-900">{confirmationDetails.firstName} {confirmationDetails.lastName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Vehicle</span>
+                <span className="font-medium text-zinc-900">{confirmationDetails.vehicleMake} {confirmationDetails.vehicleModel}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Plate</span>
+                <span className="font-medium text-zinc-900">{confirmationDetails.vehiclePlate}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Pickup</span>
+                <span className="font-medium text-zinc-900">{new Date(confirmationDetails.pickupDatetime).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Return</span>
+                <span className="font-medium text-zinc-900">{new Date(confirmationDetails.returnDatetime).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Pickup location</span>
+                <span className="font-medium text-zinc-900">{confirmationDetails.pickupLocation}</span>
+              </div>
+              <div className="flex justify-between border-t border-zinc-200 pt-3">
+                <span className="text-zinc-500">Total charged</span>
+                <span className="font-bold text-zinc-900">${confirmationDetails.total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Payment ref</span>
+                <span className="font-medium text-zinc-900 break-all text-right">{confirmationDetails.paymentReference}</span>
+              </div>
+            </div>
+
+            {(confirmationDetails.emailMessage || confirmationDetails.smsMessage) && (
+              <div className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                {confirmationDetails.emailMessage && <p>{confirmationDetails.emailMessage}</p>}
+                {confirmationDetails.smsMessage && <p className="mt-1">{confirmationDetails.smsMessage}</p>}
+              </div>
+            )}
+
+            {/* Cancel confirmation step */}
+            {cancelConfirmStep ? (
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-semibold text-red-800">Cancel this reservation?</p>
+                <p className="mt-1 text-sm text-red-700">This will permanently delete booking #{confirmationDetails.bookingId}. This cannot be undone.</p>
+                {cancelError && <p className="mt-2 text-sm text-red-600">{cancelError}</p>}
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={cancelling}
+                    onClick={async () => {
+                      if (!confirmationDetails.deletionToken) return;
+                      setCancelError("");
+                      setCancelling(true);
+                      try {
+                        await api.delete(`/public/reservations/${confirmationDetails.bookingId}`, {
+                          data: { deletionToken: confirmationDetails.deletionToken },
+                        });
+                        setConfirmationDetails(null);
+                        setCancelConfirmStep(false);
+                      } catch (err: unknown) {
+                        const msg =
+                          err && typeof err === "object" && "response" in err
+                            ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+                            : undefined;
+                        setCancelError(msg || "Failed to cancel reservation. Please contact support.");
+                      } finally {
+                        setCancelling(false);
+                      }
+                    }}
+                    className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+                  >
+                    {cancelling ? "Cancelling..." : "Yes, cancel reservation"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cancelling}
+                    onClick={() => { setCancelConfirmStep(false); setCancelError(""); }}
+                    className="flex-1 rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-60"
+                  >
+                    Keep reservation
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-5 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setConfirmationDetails(null); setCancelConfirmStep(false); setCancelError(""); }}
+                  className="w-full rounded-xl bg-[var(--color-accent)] px-4 py-3 font-semibold text-zinc-900 transition hover:brightness-95"
+                >
+                  Done
+                </button>
+                {confirmationDetails.manageToken && (
+                  <a
+                    href={`/guest-manage/${confirmationDetails.manageToken}?action=modify`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-center text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                  >
+                    Modify reservation
+                  </a>
+                )}
+                {confirmationDetails.deletionToken && (
+                  <button
+                    type="button"
+                    onClick={() => setCancelConfirmStep(true)}
+                    className="w-full rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                  >
+                    Cancel reservation
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="fixed bottom-24 right-3 z-[60] sm:right-4">
         {isFaqChatOpen && (

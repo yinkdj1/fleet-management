@@ -5,6 +5,7 @@ import type { ChangeEvent, CSSProperties, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "../components/AppShell";
 import api from "../../lib/api";
+import { formatBookingId } from "../../lib/bookingId";
 
 type User = {
   name?: string;
@@ -565,7 +566,7 @@ export default function DashboardPage() {
                 <tbody>
                   {bookingDetails.map((booking) => (
                     <tr key={booking.id} className="border-t border-zinc-200/80">
-                      <td className="p-3 text-sm font-medium text-zinc-800">#{booking.id}</td>
+                      <td className="p-3 text-sm font-medium text-zinc-800">{formatBookingId(booking.id)}</td>
                       <td className="p-3 text-sm text-zinc-700">
                         {(booking.customer?.firstName || "").trim()} {(booking.customer?.lastName || "").trim()}
                       </td>
