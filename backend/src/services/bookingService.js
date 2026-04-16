@@ -1920,8 +1920,15 @@ async function changeBookingStatus(id, nextStatus) {
 async function checkoutBooking(id, data, photos = []) {
   const booking = await getBookingById(id);
 
-  if (booking.status !== "reserved") {
-    throw buildAppError("Only reserved bookings can be checked out", 400);
+  const status = String(booking.status || "").toLowerCase();
+  const hasCheckout = Boolean(booking.checkout);
+
+  if (status === "active" && hasCheckout) {
+    throw buildAppError("This booking is already checked out", 400);
+  }
+
+  if (!(["reserved", "active"].includes(status)) || (status === "active" && hasCheckout)) {
+    throw buildAppError("Only reserved bookings or active bookings without checkout can be checked out", 400);
   }
 
   if (!data.mileageOut || !data.fuelLevelOut) {
@@ -1984,8 +1991,15 @@ async function checkoutBooking(id, data, photos = []) {
 async function checkinBooking(id, data, photos = []) {
   const booking = await getBookingById(id);
 
-  if (booking.status !== "active") {
-    throw buildAppError("Only active bookings can be checked in", 400);
+  const status = String(booking.status || "").toLowerCase();
+  const hasCheckin = Boolean(booking.checkin);
+
+  if (hasCheckin) {
+    throw buildAppError("This booking is already checked in", 400);
+  }
+
+  if (!(["reserved", "active"].includes(status))) {
+    throw buildAppError("Only reserved or active bookings can be checked in", 400);
   }
 
   if (!data.mileageIn || !data.fuelLevelIn) {
