@@ -732,6 +732,8 @@ export default function ReservePage() {
       e.target instanceof HTMLInputElement && e.target.type === "checkbox"
         ? e.target.checked
         : e.target.value;
+    const previousValue = form[name as keyof ReservationForm];
+    const didChange = previousValue !== (value as ReservationForm[keyof ReservationForm]);
 
     setForm((prev) => {
       const nextForm = {
@@ -754,7 +756,7 @@ export default function ReservePage() {
       return nextForm;
     });
 
-    if (["pickupDatetime", "returnDatetime", "vehicleId"].includes(name)) {
+    if (didChange && ["pickupDatetime", "returnDatetime", "vehicleId"].includes(name)) {
       resetPaymentState();
     }
 
@@ -762,7 +764,7 @@ export default function ReservePage() {
       resetPaymentState();
     }
 
-    if (name === "pickupDatetime" || name === "returnDatetime") {
+    if (didChange && (name === "pickupDatetime" || name === "returnDatetime")) {
       setShowVehicleList(false);
     }
 
@@ -1197,19 +1199,21 @@ export default function ReservePage() {
     }
   };
 
-  return (
-    <main
-      className={`${rentalThemeClass} relative isolate min-h-screen bg-cover bg-center bg-no-repeat px-3 pb-24 pt-2 text-[var(--color-paper)] sm:px-4 sm:pb-28 sm:pt-3`}
-    >
-      <div className="pointer-events-none absolute -left-24 top-12 h-64 w-64 rounded-full bg-[var(--color-accent)]/30 blur-3xl orb-float" />
-      <div className="pointer-events-none absolute -right-24 top-40 h-72 w-72 rounded-full bg-[var(--color-cyan)]/30 blur-3xl orb-float-delayed" />
+    return (
+      <main
+        className={`${rentalThemeClass} relative isolate min-h-screen bg-cover bg-center bg-no-repeat px-3 pb-24 pt-2 text-[var(--color-paper)] sm:px-4 sm:pb-28 sm:pt-3`}
+      >
+        <div className="pointer-events-none absolute -left-24 top-12 z-0 h-64 w-64 rounded-full bg-[var(--color-accent)]/30 blur-3xl orb-float" />
+        <div className="pointer-events-none absolute -right-24 top-40 z-0 h-72 w-72 rounded-full bg-[var(--color-cyan)]/30 blur-3xl orb-float-delayed" />
       <div
-        className={`pointer-events-none absolute inset-x-0 bottom-0 h-24 sm:h-32 ${
+          className={`pointer-events-none absolute inset-x-0 bottom-0 z-0 h-24 sm:h-32 ${
           isNightTheme
             ? "bg-gradient-to-b from-transparent via-[rgba(9,14,26,0.28)] to-[rgba(7,12,22,0.62)]"
             : "bg-gradient-to-b from-transparent via-[rgba(255,248,236,0.2)] to-[rgba(253,244,227,0.62)]"
         }`}
       />
+
+        <div>
 
       <header
         className={`sticky left-0 right-0 top-0 z-30 mb-3 px-3 py-2.5 backdrop-blur-xl sm:mb-4 sm:px-4 sm:py-3 ${
@@ -1247,9 +1251,12 @@ export default function ReservePage() {
             <button
               type="button"
               onClick={() => handleThemeModeChange("auto")}
-              onTouchStart={() => handleThemeModeChange("auto")}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                handleThemeModeChange("auto");
+              }}
               aria-pressed={themeMode === "auto"}
-              className={`rounded-full px-3 py-1 transition ${
+              className={`relative z-[120] rounded-full px-3 py-1 transition ${
                 themeMode === "auto"
                   ? "bg-[var(--color-accent)] text-zinc-900"
                   : isNightTheme
@@ -1262,9 +1269,12 @@ export default function ReservePage() {
             <button
               type="button"
               onClick={() => handleThemeModeChange("day")}
-              onTouchStart={() => handleThemeModeChange("day")}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                handleThemeModeChange("day");
+              }}
               aria-pressed={themeMode === "day"}
-              className={`rounded-full px-3 py-1 transition ${
+              className={`relative z-[120] rounded-full px-3 py-1 transition ${
                 themeMode === "day"
                   ? "bg-[var(--color-accent)] text-zinc-900"
                   : isNightTheme
@@ -1277,9 +1287,12 @@ export default function ReservePage() {
             <button
               type="button"
               onClick={() => handleThemeModeChange("night")}
-              onTouchStart={() => handleThemeModeChange("night")}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                handleThemeModeChange("night");
+              }}
               aria-pressed={themeMode === "night"}
-              className={`rounded-full px-3 py-1 transition ${
+              className={`relative z-[120] rounded-full px-3 py-1 transition ${
                 themeMode === "night"
                   ? "bg-[var(--color-accent)] text-zinc-900"
                   : isNightTheme
@@ -1295,7 +1308,7 @@ export default function ReservePage() {
 
       <section
         aria-label="Reservation highlights"
-        className={`mx-auto mb-4 grid w-full max-w-7xl gap-3 rounded-2xl border p-4 shadow-[0_24px_60px_-40px_rgba(146,64,14,0.5)] backdrop-blur sm:grid-cols-3 ${
+          className={`relative z-10 mx-auto mb-4 grid w-full max-w-7xl gap-3 rounded-2xl border p-4 shadow-[0_24px_60px_-40px_rgba(146,64,14,0.5)] backdrop-blur sm:grid-cols-3 ${
           isNightTheme
             ? "border-slate-200/20 bg-[rgba(15,24,41,0.72)]"
             : "border-amber-900/15 bg-white/72"
@@ -1364,7 +1377,7 @@ export default function ReservePage() {
         </article>
       </section>
 
-      <div className="mx-auto grid w-full max-w-7xl flex-1 gap-6 lg:grid-cols-3 lg:gap-8">
+      <div className="relative z-10 mx-auto grid w-full max-w-7xl flex-1 gap-6 lg:grid-cols-3 lg:gap-8">
         <section
           className={`fade-up rounded-3xl border p-6 shadow-[0_30px_70px_-32px_rgba(146,64,14,0.34)] backdrop-blur-xl md:p-8 lg:col-span-2 ${
             isNightTheme
@@ -1436,7 +1449,11 @@ export default function ReservePage() {
                   <button
                     type="button"
                     onClick={() => setShowVehicleList(true)}
-                    className="w-full rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700"
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      setShowVehicleList(true);
+                    }}
+                    className="touch-manipulation relative z-[120] w-full rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.99] hover:bg-zinc-700"
                   >
                     Search Cars
                   </button>
@@ -2215,7 +2232,7 @@ export default function ReservePage() {
       </div>
 
       <section
-        className={`mx-auto mt-6 w-full max-w-7xl rounded-3xl border p-5 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:p-6 ${
+          className={`relative z-10 mx-auto mt-6 w-full max-w-7xl rounded-3xl border p-5 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:p-6 ${
           isNightTheme
             ? "border-slate-200/20 bg-[rgba(15,24,41,0.78)]"
             : "border-amber-900/15 bg-white/80"
@@ -2384,7 +2401,7 @@ export default function ReservePage() {
       </section>
 
       <footer
-        className={`relative mt-6 border-t px-3 py-2.5 text-center text-xs backdrop-blur-xl sm:fixed sm:bottom-0 sm:left-0 sm:right-0 sm:z-40 sm:px-4 sm:py-3 sm:text-sm ${
+          className={`relative z-10 mt-6 border-t px-3 py-2.5 text-center text-xs backdrop-blur-xl sm:fixed sm:bottom-0 sm:left-0 sm:right-0 sm:z-40 sm:px-4 sm:py-3 sm:text-sm ${
           isNightTheme
             ? "border-slate-300/20 bg-[rgba(10,16,30,0.88)] text-slate-100"
             : "border-amber-900/15 bg-[rgba(255,248,237,0.94)] text-zinc-900"
@@ -2584,10 +2601,10 @@ export default function ReservePage() {
         </div>
       )}
 
-      <div className="fixed bottom-24 right-3 z-[60] sm:right-4">
+        <div className="pointer-events-auto fixed bottom-24 right-3 z-[60] sm:right-4">
         {isFaqChatOpen && (
           <section
-            className={`mb-3 w-[min(94vw,380px)] overflow-hidden rounded-2xl border shadow-[0_24px_60px_-34px_rgba(0,0,0,0.55)] backdrop-blur-xl ${
+              className={`pointer-events-auto mb-3 w-[min(94vw,380px)] overflow-hidden rounded-2xl border shadow-[0_24px_60px_-34px_rgba(0,0,0,0.55)] backdrop-blur-xl ${
               isNightTheme
                 ? "border-slate-300/20 bg-[rgba(15,23,42,0.94)]"
                 : "border-amber-900/15 bg-[rgba(255,251,245,0.96)]"
@@ -2698,11 +2715,17 @@ export default function ReservePage() {
         <button
           type="button"
           onClick={() => setIsFaqChatOpen((prev) => !prev)}
-          className="rounded-full border border-amber-300/45 bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-zinc-900 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)] transition hover:-translate-y-0.5"
+          onPointerDown={(event) => {
+            event.preventDefault();
+            setIsFaqChatOpen((prev) => !prev);
+          }}
+            className="pointer-events-auto relative z-[120] rounded-full border border-amber-300/45 bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-zinc-900 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.6)] transition hover:-translate-y-0.5"
         >
           {isFaqChatOpen ? "Hide FAQ Chat" : "FAQ Chat"}
         </button>
       </div>
-    </main>
+
+        </div>
+      </main>
   );
 }
