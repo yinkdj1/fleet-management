@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../lib/api";
+import { formatBookingId } from "../../lib/bookingId";
 import {
   calculateBookingPricePreview,
   DEFAULT_BOOKING_DISCOUNT_TIERS,
@@ -139,7 +140,14 @@ const FAQ_ENTRIES: Array<{
   answer: string;
 }> = [
   {
-    keywords: ["rideshare", "ride share", "uber", "lyft", "doordash", "instacart"],
+    keywords: [
+      "rideshare",
+      "ride share",
+      "uber",
+      "lyft",
+      "doordash",
+      "instacart",
+    ],
     answer:
       "Yes, guests can rent for rideshare use. Choose a vehicle marked Personal/Rideshare during reservation.",
   },
@@ -251,6 +259,19 @@ function isAtLeast18(dateOfBirth: string) {
   return dob <= getMinimumAllowedDateOfBirth();
 }
 
+function extractManageTokenFromUrl(value?: string | null) {
+  if (!value) return undefined;
+
+  const marker = "/guest-manage/";
+  const markerIndex = value.indexOf(marker);
+  if (markerIndex < 0) return undefined;
+
+  const start = markerIndex + marker.length;
+  const remainder = value.slice(start);
+  const token = remainder.split("?")[0].split("#")[0].trim();
+  return token || undefined;
+}
+
 function getDefaultReturnDatetime(pickupDatetime: string) {
   const pickup = new Date(pickupDatetime);
   if (Number.isNaN(pickup.getTime())) {
@@ -279,7 +300,10 @@ function isValidEmail(email: string) {
 
 function isValidPhone(phone: string) {
   const digitsOnly = phone.replace(/\D/g, "");
-  return digitsOnly.length === 10 || (digitsOnly.length === 11 && digitsOnly.startsWith("1"));
+  return (
+    digitsOnly.length === 10 ||
+    (digitsOnly.length === 11 && digitsOnly.startsWith("1"))
+  );
 }
 
 function normalizeUsPhone(phone: string) {
@@ -325,7 +349,8 @@ function isValidCvv(cvv: string) {
 
 function getApiErrorMessage(error: unknown, fallback: string) {
   if (error && typeof error === "object" && "response" in error) {
-    const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+    const message = (error as { response?: { data?: { message?: string } } })
+      .response?.data?.message;
     if (message) return message;
   }
 
@@ -395,7 +420,7 @@ function normalizeStateCode(value: string) {
   }
 
   const match = US_STATES.find(
-    (state) => state.name.toLowerCase() === trimmed.toLowerCase()
+    (state) => state.name.toLowerCase() === trimmed.toLowerCase(),
   );
 
   return match?.code || "";
@@ -430,10 +455,13 @@ async function doesZipMatchState(zip: string, stateCode: string) {
 
 export default function ReservePage() {
   const [themeMode, setThemeMode] = useState<"auto" | "day" | "night">("auto");
-  const [rentalThemeClass, setRentalThemeClass] = useState("reserve-rental-bg-day");
+  const [rentalThemeClass, setRentalThemeClass] = useState(
+    "reserve-rental-bg-day",
+  );
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [error, setError] = useState("");
-  const [confirmationDetails, setConfirmationDetails] = useState<ConfirmationDetails | null>(null);
+  const [confirmationDetails, setConfirmationDetails] =
+    useState<ConfirmationDetails | null>(null);
   const [cancelConfirmStep, setCancelConfirmStep] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
@@ -477,7 +505,7 @@ export default function ReservePage() {
     paymentConfirmed: false,
   });
   const [discountTiers, setDiscountTiers] = useState<BookingDiscountTier[]>(
-    DEFAULT_BOOKING_DISCOUNT_TIERS
+    DEFAULT_BOOKING_DISCOUNT_TIERS,
   );
   const [pickupLocation, setPickupLocation] = useState("Main Office");
   const [isFaqChatOpen, setIsFaqChatOpen] = useState(false);
@@ -494,18 +522,22 @@ export default function ReservePage() {
 
   const maxDateOfBirth = useMemo(
     () => formatDateForInput(getMinimumAllowedDateOfBirth()),
-    []
+    [],
   );
 
   const fetchReservationSettings = async () => {
     try {
       const res = await api.get("/public/discount-settings");
-      const settings = (res.data?.data || {}) as Partial<PublicReservationSettings>;
+      const settings = (res.data?.data ||
+        {}) as Partial<PublicReservationSettings>;
       const tiers = settings.tiers;
       if (Array.isArray(tiers) && tiers.length > 0) {
         setDiscountTiers(tiers);
       }
-      if (typeof settings.pickupLocation === "string" && settings.pickupLocation.trim()) {
+      if (
+        typeof settings.pickupLocation === "string" &&
+        settings.pickupLocation.trim()
+      ) {
         setPickupLocation(settings.pickupLocation.trim());
       }
     } catch {
@@ -580,15 +612,22 @@ export default function ReservePage() {
     const fetchVehicles = async () => {
       setError("");
       if (new Date(form.returnDatetime) <= new Date(form.pickupDatetime)) {
-        setError("Return date/time must be at least 24 hours after pickup date/time");
+        setError(
+          "Return date/time must be at least 24 hours after pickup date/time",
+        );
         setVehicles([]);
         setForm((prev) => ({ ...prev, vehicleId: "" }));
         return;
       }
 
       const minimumReturn = getMinimumReturnDatetime(form.pickupDatetime);
-      if (minimumReturn && new Date(form.returnDatetime) < new Date(minimumReturn)) {
-        setError("Return date/time must be at least 24 hours after pickup date/time");
+      if (
+        minimumReturn &&
+        new Date(form.returnDatetime) < new Date(minimumReturn)
+      ) {
+        setError(
+          "Return date/time must be at least 24 hours after pickup date/time",
+        );
         setVehicles([]);
         setForm((prev) => ({ ...prev, vehicleId: "" }));
         return;
@@ -610,7 +649,9 @@ export default function ReservePage() {
 
         setForm((prev) => ({
           ...prev,
-          vehicleId: payload.some((v: Vehicle) => String(v.id) === prev.vehicleId)
+          vehicleId: payload.some(
+            (v: Vehicle) => String(v.id) === prev.vehicleId,
+          )
             ? prev.vehicleId
             : "",
         }));
@@ -627,7 +668,7 @@ export default function ReservePage() {
 
   const selectedVehicle = useMemo(
     () => vehicles.find((vehicle) => String(vehicle.id) === form.vehicleId),
-    [vehicles, form.vehicleId]
+    [vehicles, form.vehicleId],
   );
 
   const pricePreview = useMemo(() => {
@@ -641,11 +682,16 @@ export default function ReservePage() {
       dailyRate: Number(selectedVehicle.dailyRate || 0),
       discountTiers,
     });
-  }, [discountTiers, selectedVehicle, form.pickupDatetime, form.returnDatetime]);
+  }, [
+    discountTiers,
+    selectedVehicle,
+    form.pickupDatetime,
+    form.returnDatetime,
+  ]);
 
   const allTermsAccepted = useMemo(
     () => Object.values(termsChecks).every(Boolean),
-    [termsChecks]
+    [termsChecks],
   );
 
   useEffect(() => {
@@ -679,7 +725,7 @@ export default function ReservePage() {
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name } = e.target;
     const value =
@@ -698,7 +744,8 @@ export default function ReservePage() {
           nextForm.returnDatetime = "";
         } else if (
           !prev.returnDatetime ||
-          new Date(prev.returnDatetime) < new Date(getMinimumReturnDatetime(value))
+          new Date(prev.returnDatetime) <
+            new Date(getMinimumReturnDatetime(value))
         ) {
           nextForm.returnDatetime = getDefaultReturnDatetime(value);
         }
@@ -722,8 +769,7 @@ export default function ReservePage() {
     setFieldErrors((prev) => ({
       ...prev,
       [name]: "",
-      returnDatetime:
-        name === "pickupDatetime" ? "" : prev.returnDatetime,
+      returnDatetime: name === "pickupDatetime" ? "" : prev.returnDatetime,
     }));
 
     if (name === "email" || name === "phone") {
@@ -772,9 +818,7 @@ export default function ReservePage() {
     }
   };
 
-  const handleContactBlur = async (
-    e: React.FocusEvent<HTMLInputElement>
-  ) => {
+  const handleContactBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
     if (name !== "email" && name !== "phone") {
@@ -822,7 +866,8 @@ export default function ReservePage() {
         ...prev,
         // Preserve whatever the user already typed for name fields; only
         // fall back to the stored name if the field is still empty.
-        firstName: prev.firstName.trim() || existing.firstName || prev.firstName,
+        firstName:
+          prev.firstName.trim() || existing.firstName || prev.firstName,
         lastName: prev.lastName.trim() || existing.lastName || prev.lastName,
         email: existing.email || prev.email,
         phone: existing.phone || prev.phone,
@@ -845,7 +890,9 @@ export default function ReservePage() {
         dateOfBirth: "",
       }));
 
-      setLookupMessage("Returning customer — details pre-filled. Update any fields that have changed.");
+      setLookupMessage(
+        "Returning customer — details pre-filled. Update any fields that have changed.",
+      );
     } catch {
       setLookupMessage("");
     } finally {
@@ -886,7 +933,7 @@ export default function ReservePage() {
       setPaymentMessage(
         payload.status === "paid"
           ? `Demo payment confirmed (${payload.cardBrand?.toUpperCase()} ****${payload.last4}). Ref: ${payload.paymentReference}`
-          : "Payment not completed."
+          : "Payment not completed.",
       );
     } catch {
       setError("Demo payment failed");
@@ -981,8 +1028,10 @@ export default function ReservePage() {
       errors.dateOfBirth = "Customer must be at least 18 years old";
     }
 
-    if (!form.pickupDatetime) errors.pickupDatetime = "Pickup date/time is required";
-    if (!form.returnDatetime) errors.returnDatetime = "Return date/time is required";
+    if (!form.pickupDatetime)
+      errors.pickupDatetime = "Pickup date/time is required";
+    if (!form.returnDatetime)
+      errors.returnDatetime = "Return date/time is required";
     if (!form.vehicleId) errors.vehicleId = "Please choose a vehicle";
     if (!form.paymentReference.trim()) {
       errors.paymentReference = "Payment reference is required";
@@ -991,15 +1040,18 @@ export default function ReservePage() {
       errors.paymentConfirmed = "Confirm payment before submitting";
     }
     if (!allTermsAccepted) {
-      errors.termsAccepted = "You must accept all rental terms before confirming reservation";
+      errors.termsAccepted =
+        "You must accept all rental terms before confirming reservation";
     }
 
     if (
       form.pickupDatetime &&
       form.returnDatetime &&
-      new Date(form.returnDatetime) < new Date(getMinimumReturnDatetime(form.pickupDatetime))
+      new Date(form.returnDatetime) <
+        new Date(getMinimumReturnDatetime(form.pickupDatetime))
     ) {
-      errors.returnDatetime = "Return date/time must be at least 24 hours after pickup date/time";
+      errors.returnDatetime =
+        "Return date/time must be at least 24 hours after pickup date/time";
     }
 
     return errors;
@@ -1063,10 +1115,22 @@ export default function ReservePage() {
       });
 
       const bookingId = res.data?.data?.id;
-      const confirmationEmailMessage = res.data?.data?.confirmationEmail?.message;
+      const confirmationEmailMessage =
+        res.data?.data?.confirmationEmail?.message;
       const confirmationSmsMessage = res.data?.data?.confirmationSms?.message;
-      const deletionToken = res.data?.data?.deletionToken as string | undefined;
-      const manageToken = res.data?.data?.manageToken as string | undefined;
+        const confirmationEmailLinks = res.data?.data?.confirmationEmail?.links;
+        const confirmationSmsLinks = res.data?.data?.confirmationSms?.links;
+        const manageToken =
+          confirmationEmailLinks?.token ||
+          confirmationSmsLinks?.token ||
+          extractManageTokenFromUrl(confirmationEmailLinks?.manageUrl) ||
+          extractManageTokenFromUrl(confirmationEmailLinks?.modifyUrl) ||
+          extractManageTokenFromUrl(confirmationEmailLinks?.cancelUrl) ||
+          extractManageTokenFromUrl(confirmationSmsLinks?.manageUrl) ||
+          extractManageTokenFromUrl(confirmationSmsLinks?.modifyUrl) ||
+          extractManageTokenFromUrl(confirmationSmsLinks?.cancelUrl) ||
+          (res.data?.data?.manageToken as string | undefined);
+        const deletionToken = res.data?.data?.deletionToken as string | undefined;
 
       if (bookingId && selectedVehicle && pricePreview) {
         setConfirmationDetails({
@@ -1105,15 +1169,26 @@ export default function ReservePage() {
         paymentReference: "",
         paymentConfirmed: false,
       });
-      setPaymentForm({ cardholderName: "", cardNumber: "", expiry: "", cvv: "" });
-      setTermsChecks({ accuracy: false, agreement: false, authorization: false, esign: false });
+      setPaymentForm({
+        cardholderName: "",
+        cardNumber: "",
+        expiry: "",
+        cvv: "",
+      });
+      setTermsChecks({
+        accuracy: false,
+        agreement: false,
+        authorization: false,
+        esign: false,
+      });
       setLookupMessage("");
       setPaymentMessage("");
       setVehicles([]);
     } catch (err: unknown) {
       const responseErrors =
         err && typeof err === "object" && "response" in err
-          ? (err as { response?: { data?: { errors?: FieldErrors } } }).response?.data?.errors || {}
+          ? (err as { response?: { data?: { errors?: FieldErrors } } }).response
+              ?.data?.errors || {}
           : {};
       setError(getApiErrorMessage(err, "Failed to submit reservation"));
       setFieldErrors(responseErrors);
@@ -1123,7 +1198,9 @@ export default function ReservePage() {
   };
 
   return (
-    <main className={`${rentalThemeClass} relative isolate min-h-screen bg-cover bg-center bg-no-repeat px-3 pb-24 pt-2 text-[var(--color-paper)] sm:px-4 sm:pb-28 sm:pt-3`}>
+    <main
+      className={`${rentalThemeClass} relative isolate min-h-screen bg-cover bg-center bg-no-repeat px-3 pb-24 pt-2 text-[var(--color-paper)] sm:px-4 sm:pb-28 sm:pt-3`}
+    >
       <div className="pointer-events-none absolute -left-24 top-12 h-64 w-64 rounded-full bg-[var(--color-accent)]/30 blur-3xl orb-float" />
       <div className="pointer-events-none absolute -right-24 top-40 h-72 w-72 rounded-full bg-[var(--color-cyan)]/30 blur-3xl orb-float-delayed" />
       <div
@@ -1134,27 +1211,39 @@ export default function ReservePage() {
         }`}
       />
 
-      <header className={`sticky left-0 right-0 top-0 z-30 mb-3 px-3 py-2.5 backdrop-blur-xl sm:mb-4 sm:px-4 sm:py-3 ${
-        isNightTheme
-          ? "bg-[linear-gradient(180deg,rgba(10,16,30,0.58),rgba(10,16,30,0.2),transparent)]"
-          : "bg-[linear-gradient(180deg,rgba(255,248,237,0.6),rgba(255,248,237,0.22),transparent)]"
-      }`}>
+      <header
+        className={`sticky left-0 right-0 top-0 z-30 mb-3 px-3 py-2.5 backdrop-blur-xl sm:mb-4 sm:px-4 sm:py-3 ${
+          isNightTheme
+            ? "bg-[linear-gradient(180deg,rgba(10,16,30,0.58),rgba(10,16,30,0.2),transparent)]"
+            : "bg-[linear-gradient(180deg,rgba(255,248,237,0.6),rgba(255,248,237,0.22),transparent)]"
+        }`}
+      >
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3">
           <img
-            src="/logo3.jpeg"
-            alt="Carsgidi logo"
-            className={`float-soft h-14 w-auto object-contain opacity-88 sm:h-16 md:h-20 ${
+            src={isNightTheme ? "/dark.jpeg" : "/day.jpeg"}
+            alt={
+              isNightTheme ? "Dark theme banner icon" : "Day theme banner icon"
+            }
+            style={{
+              WebkitMaskImage:
+                "radial-gradient(circle at center, rgba(0,0,0,1) 62%, rgba(0,0,0,0) 100%)",
+              maskImage:
+                "radial-gradient(circle at center, rgba(0,0,0,1) 62%, rgba(0,0,0,0) 100%)",
+            }}
+            className={`float-soft h-14 w-auto object-contain sm:h-16 md:h-20 ${
               isNightTheme
-                ? "mix-blend-screen brightness-125 contrast-125 saturate-110 drop-shadow-[0_12px_24px_rgba(2,6,18,0.55)]"
-                : "mix-blend-multiply brightness-95 contrast-105 saturate-90 drop-shadow-[0_10px_20px_rgba(120,53,15,0.18)]"
+                ? "opacity-80 mix-blend-screen brightness-115 contrast-110 saturate-90 drop-shadow-[0_10px_20px_rgba(2,6,18,0.35)]"
+                : "opacity-78 mix-blend-multiply brightness-96 contrast-96 saturate-75 drop-shadow-[0_8px_18px_rgba(120,53,15,0.14)]"
             }`}
           />
 
-          <div className={`pointer-events-auto flex items-center gap-1 rounded-full border p-1 text-xs font-semibold shadow-[0_12px_30px_-20px_rgba(146,64,14,0.5)] ${
-            isNightTheme
-              ? "border-slate-300/25 bg-white/15 text-slate-100"
-              : "border-amber-900/20 bg-white/80 text-zinc-700"
-          }`}>
+          <div
+            className={`pointer-events-auto flex items-center gap-1 rounded-full border p-1 text-xs font-semibold shadow-[0_12px_30px_-20px_rgba(146,64,14,0.5)] ${
+              isNightTheme
+                ? "border-slate-300/25 bg-white/15 text-slate-100"
+                : "border-amber-900/20 bg-white/80 text-zinc-700"
+            }`}
+          >
             <button
               type="button"
               onClick={() => handleThemeModeChange("auto")}
@@ -1221,10 +1310,14 @@ export default function ReservePage() {
           }`}
           style={{ "--anim-delay": "20ms" } as React.CSSProperties}
         >
-          <p className={`text-xs uppercase tracking-[0.2em] ${isNightTheme ? "text-slate-300" : "text-zinc-500"}`}>
+          <p
+            className={`text-xs uppercase tracking-[0.2em] ${isNightTheme ? "text-slate-300" : "text-zinc-500"}`}
+          >
             Flexible Rental
           </p>
-          <p className={`mt-1 text-sm font-semibold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+          <p
+            className={`mt-1 text-sm font-semibold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+          >
             Daily, weekend, and custom return windows
           </p>
         </article>
@@ -1237,10 +1330,14 @@ export default function ReservePage() {
               : "border-amber-900/10 bg-white/75"
           }`}
         >
-          <p className={`text-xs uppercase tracking-[0.2em] ${isNightTheme ? "text-slate-300" : "text-zinc-500"}`}>
+          <p
+            className={`text-xs uppercase tracking-[0.2em] ${isNightTheme ? "text-slate-300" : "text-zinc-500"}`}
+          >
             Instant Confirmation
           </p>
-          <p className={`mt-1 text-sm font-semibold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+          <p
+            className={`mt-1 text-sm font-semibold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+          >
             Live availability and quick booking flow
           </p>
         </article>
@@ -1254,35 +1351,49 @@ export default function ReservePage() {
           }`}
           style={{ "--anim-delay": "160ms" } as React.CSSProperties}
         >
-          <p className={`text-xs uppercase tracking-[0.2em] ${isNightTheme ? "text-slate-300" : "text-zinc-500"}`}>
+          <p
+            className={`text-xs uppercase tracking-[0.2em] ${isNightTheme ? "text-slate-300" : "text-zinc-500"}`}
+          >
             Road Ready Fleet
           </p>
-          <p className={`mt-1 text-sm font-semibold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+          <p
+            className={`mt-1 text-sm font-semibold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+          >
             Inspected vehicles with clear pricing
           </p>
         </article>
       </section>
 
       <div className="mx-auto grid w-full max-w-7xl flex-1 gap-6 lg:grid-cols-3 lg:gap-8">
-        <section className={`fade-up rounded-3xl border p-6 shadow-[0_30px_70px_-32px_rgba(146,64,14,0.34)] backdrop-blur-xl md:p-8 lg:col-span-2 ${
-          isNightTheme
-            ? "border-slate-200/20 bg-[linear-gradient(158deg,rgba(15,24,41,0.88),rgba(30,41,59,0.8))]"
-            : "border-amber-900/15 bg-[linear-gradient(158deg,rgba(255,251,244,0.95),rgba(248,239,224,0.93))]"
-        }`}>
+        <section
+          className={`fade-up rounded-3xl border p-6 shadow-[0_30px_70px_-32px_rgba(146,64,14,0.34)] backdrop-blur-xl md:p-8 lg:col-span-2 ${
+            isNightTheme
+              ? "border-slate-200/20 bg-[linear-gradient(158deg,rgba(15,24,41,0.88),rgba(30,41,59,0.8))]"
+              : "border-amber-900/15 bg-[linear-gradient(158deg,rgba(255,251,244,0.95),rgba(248,239,224,0.93))]"
+          }`}
+        >
           <form onSubmit={handleSubmit} className="mt-6 sm:mt-8 space-y-6">
             <div className="grid grid-cols-1 gap-6">
               <aside className="relative rounded-2xl border border-amber-300/35 bg-white/80 p-4 shadow-[0_20px_44px_-30px_rgba(21,94,117,0.55)]">
                 <div className="pointer-events-none absolute -inset-2 -z-10 rounded-3xl bg-[radial-gradient(circle_at_70%_20%,rgba(245,191,98,0.42),transparent_55%),radial-gradient(circle_at_25%_80%,rgba(109,211,220,0.34),transparent_58%)] blur-xl" />
-                <h2 className="text-base font-semibold text-zinc-900">Reservation Card</h2>
+                <h2 className="text-base font-semibold text-zinc-900">
+                  Reservation Card
+                </h2>
 
                 <div className="mt-4 rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800">Pickup location</p>
-                  <p className="mt-1 text-sm font-semibold text-zinc-900">{pickupLocation}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800">
+                    Pickup location
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-zinc-900">
+                    {pickupLocation}
+                  </p>
                 </div>
 
                 <div className="mt-4 space-y-3">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-zinc-700">Pickup date</label>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700">
+                      Pickup date
+                    </label>
                     <input
                       type="datetime-local"
                       name="pickupDatetime"
@@ -1292,46 +1403,34 @@ export default function ReservePage() {
                       required
                     />
                     {fieldErrors.pickupDatetime && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.pickupDatetime}</p>
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.pickupDatetime}
+                      </p>
                     )}
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-zinc-700">Return date</label>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700">
+                      Return date
+                    </label>
                     <input
                       type="datetime-local"
                       name="returnDatetime"
                       value={form.returnDatetime}
                       onChange={handleChange}
-                      min={form.pickupDatetime ? getMinimumReturnDatetime(form.pickupDatetime) : undefined}
+                      min={
+                        form.pickupDatetime
+                          ? getMinimumReturnDatetime(form.pickupDatetime)
+                          : undefined
+                      }
                       className="form-input-modern w-full rounded-xl p-3 text-zinc-900"
                       required
                     />
                     {fieldErrors.returnDatetime && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.returnDatetime}</p>
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.returnDatetime}
+                      </p>
                     )}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-zinc-700">Vehicle</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowVehicleList((prev) => !prev)}
-                      className="form-input-modern w-full rounded-xl px-4 py-3 text-left text-zinc-900 disabled:opacity-60"
-                    >
-                      {!form.pickupDatetime || !form.returnDatetime
-                        ? "Set pickup and return date/time first"
-                        : loadingVehicles
-                          ? "Checking availability..."
-                          : selectedVehicle
-                            ? `${selectedVehicle.make} ${selectedVehicle.model} | ${selectedVehicle.plateNumber} | ${formatUsageTypeLabel(selectedVehicle.usageType)}`
-                            : "Select available vehicle"}
-                    </button>
-                    <p className="mt-2 text-xs text-zinc-500">
-                      Available cars will appear in a dedicated selection panel below.
-                    </p>
-
-                    {fieldErrors.vehicleId && <p className="mt-1 text-sm text-red-600">{fieldErrors.vehicleId}</p>}
                   </div>
 
                   <button
@@ -1341,34 +1440,51 @@ export default function ReservePage() {
                   >
                     Search Cars
                   </button>
+
+                  {fieldErrors.vehicleId && (
+                    <p className="text-sm text-red-600">
+                      {fieldErrors.vehicleId}
+                    </p>
+                  )}
                 </div>
               </aside>
             </div>
 
             {showVehicleList && (
-              <section className={`rounded-[28px] border p-4 shadow-[0_28px_80px_-42px_rgba(15,23,42,0.55)] backdrop-blur-xl md:p-5 ${
-                isNightTheme
-                  ? "border-slate-200/15 bg-[linear-gradient(165deg,rgba(255,255,255,0.08),rgba(15,23,42,0.45))]"
-                  : "border-amber-900/15 bg-[linear-gradient(165deg,rgba(255,255,255,0.94),rgba(255,247,237,0.9))]"
-              }`}>
+              <section
+                className={`rounded-[28px] border p-4 shadow-[0_28px_80px_-42px_rgba(15,23,42,0.55)] backdrop-blur-xl md:p-5 ${
+                  isNightTheme
+                    ? "border-slate-200/15 bg-[linear-gradient(165deg,rgba(255,255,255,0.08),rgba(15,23,42,0.45))]"
+                    : "border-amber-900/15 bg-[linear-gradient(165deg,rgba(255,255,255,0.94),rgba(255,247,237,0.9))]"
+                }`}
+              >
                 <div className="flex flex-col gap-3 border-b border-black/5 pb-4 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${isNightTheme ? "text-amber-300" : "text-[var(--color-accent-deep)]"}`}>
+                    <p
+                      className={`text-xs font-semibold uppercase tracking-[0.22em] ${isNightTheme ? "text-amber-300" : "text-[var(--color-accent-deep)]"}`}
+                    >
                       Available Cars
                     </p>
-                    <h3 className={`mt-2 text-xl font-black sm:text-2xl ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+                    <h3
+                      className={`mt-2 text-xl font-black sm:text-2xl ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+                    >
                       Choose the right ride for your dates
                     </h3>
-                    <p className={`mt-1 text-sm ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}>
-                      Larger vehicle cards, clearer details, and faster comparison.
+                    <p
+                      className={`mt-1 text-sm ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}
+                    >
+                      Larger vehicle cards, clearer details, and faster
+                      comparison.
                     </p>
                   </div>
                   {selectedVehicle && (
-                    <div className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
-                      isNightTheme
-                        ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
-                        : "border-amber-300/50 bg-amber-50 text-amber-900"
-                    }`}>
+                    <div
+                      className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                        isNightTheme
+                          ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
+                          : "border-amber-300/50 bg-amber-50 text-amber-900"
+                      }`}
+                    >
                       Selected: {selectedVehicle.make} {selectedVehicle.model}
                     </div>
                   )}
@@ -1380,7 +1496,9 @@ export default function ReservePage() {
                       Select pickup and return date/time to load available cars.
                     </p>
                   ) : loadingVehicles ? (
-                    <p className="px-4 py-8 text-sm text-zinc-600">Loading available cars...</p>
+                    <p className="px-4 py-8 text-sm text-zinc-600">
+                      Loading available cars...
+                    </p>
                   ) : vehicles.length === 0 ? (
                     <p className="px-4 py-8 text-sm text-zinc-600">
                       No available cars found for the selected dates.
@@ -1388,7 +1506,8 @@ export default function ReservePage() {
                   ) : (
                     <div className="grid max-h-[34rem] gap-3 overflow-y-auto p-1 lg:grid-cols-2">
                       {vehicles.map((vehicle, index) => {
-                        const isSelected = String(vehicle.id) === form.vehicleId;
+                        const isSelected =
+                          String(vehicle.id) === form.vehicleId;
                         const passengerCount =
                           vehicle.passengers ??
                           vehicle.seats ??
@@ -1399,8 +1518,14 @@ export default function ReservePage() {
                           <button
                             key={vehicle.id}
                             type="button"
-                            onClick={() => handleSelectVehicle(String(vehicle.id))}
-                            style={{ "--anim-delay": `${index * 45}ms` } as React.CSSProperties}
+                            onClick={() =>
+                              handleSelectVehicle(String(vehicle.id))
+                            }
+                            style={
+                              {
+                                "--anim-delay": `${index * 45}ms`,
+                              } as React.CSSProperties
+                            }
                             className={`group w-full rounded-[22px] border px-4 py-4 text-left transition hover:-translate-y-0.5 hover:border-amber-300/60 hover:shadow-[0_20px_40px_-24px_rgba(15,23,42,0.45)] ${
                               isNightTheme
                                 ? "border-slate-200/15 bg-[rgba(15,23,42,0.72)]"
@@ -1416,45 +1541,71 @@ export default function ReservePage() {
                             <div className="flex h-full flex-col gap-4">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <p className={`truncate text-lg font-bold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+                                  <p
+                                    className={`truncate text-lg font-bold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+                                  >
                                     {vehicle.make} {vehicle.model}
                                   </p>
-                                  <p className={`mt-1 text-sm ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}>
+                                  <p
+                                    className={`mt-1 text-sm ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}
+                                  >
                                     Plate: {vehicle.plateNumber}
                                   </p>
                                 </div>
-                                <div className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                                  isNightTheme ? "bg-white/10 text-amber-200" : "bg-amber-50 text-amber-900"
-                                }`}>
-                                  ${Number(vehicle.dailyRate || 0).toFixed(2)}/day
+                                <div
+                                  className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                                    isNightTheme
+                                      ? "bg-white/10 text-amber-200"
+                                      : "bg-amber-50 text-amber-900"
+                                  }`}
+                                >
+                                  ${Number(vehicle.dailyRate || 0).toFixed(2)}
+                                  /day
                                 </div>
                               </div>
 
                               <img
-                                src={vehicle.imageUrl ? `http://localhost:5000${vehicle.imageUrl}` : "/placeholder-vehicle.svg"}
+                                src={
+                                  vehicle.imageUrl
+                                    ? `http://localhost:5000${vehicle.imageUrl}`
+                                    : "/placeholder-vehicle.svg"
+                                }
                                 alt={`${vehicle.make} ${vehicle.model}`}
                                 className="h-40 w-full rounded-2xl border border-black/5 object-cover shadow-sm"
                               />
 
                               <div className="flex flex-wrap gap-2 text-xs font-medium">
                                 {vehicle.description && (
-                                  <p className={`w-full text-sm leading-relaxed ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}>
+                                  <p
+                                    className={`w-full text-sm leading-relaxed ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}
+                                  >
                                     {vehicle.description}
                                   </p>
                                 )}
-                                <span className={`rounded-full px-2.5 py-1 ${isNightTheme ? "bg-amber-300/20 text-amber-100" : "bg-amber-100 text-amber-900"}`}>
-                                  Usage: {formatUsageTypeLabel(vehicle.usageType)}
+                                <span
+                                  className={`rounded-full px-2.5 py-1 ${isNightTheme ? "bg-amber-300/20 text-amber-100" : "bg-amber-100 text-amber-900"}`}
+                                >
+                                  Usage:{" "}
+                                  {formatUsageTypeLabel(vehicle.usageType)}
                                 </span>
-                                <span className={`rounded-full px-2.5 py-1 ${isNightTheme ? "bg-white/10 text-slate-200" : "bg-zinc-100 text-zinc-700"}`}>
+                                <span
+                                  className={`rounded-full px-2.5 py-1 ${isNightTheme ? "bg-white/10 text-slate-200" : "bg-zinc-100 text-zinc-700"}`}
+                                >
                                   Fuel: {vehicle.fuelType || "N/A"}
                                 </span>
-                                <span className={`rounded-full px-2.5 py-1 ${isNightTheme ? "bg-white/10 text-slate-200" : "bg-zinc-100 text-zinc-700"}`}>
+                                <span
+                                  className={`rounded-full px-2.5 py-1 ${isNightTheme ? "bg-white/10 text-slate-200" : "bg-zinc-100 text-zinc-700"}`}
+                                >
                                   Transmission: {vehicle.transmission || "N/A"}
                                 </span>
-                                <span className={`rounded-full px-2.5 py-1 ${isNightTheme ? "bg-white/10 text-slate-200" : "bg-zinc-100 text-zinc-700"}`}>
+                                <span
+                                  className={`rounded-full px-2.5 py-1 ${isNightTheme ? "bg-white/10 text-slate-200" : "bg-zinc-100 text-zinc-700"}`}
+                                >
                                   Passengers: {passengerCount ?? "N/A"}
                                 </span>
-                                <span className={`rounded-full px-2.5 py-1 ${isNightTheme ? "bg-white/10 text-slate-200" : "bg-zinc-100 text-zinc-700"}`}>
+                                <span
+                                  className={`rounded-full px-2.5 py-1 ${isNightTheme ? "bg-white/10 text-slate-200" : "bg-zinc-100 text-zinc-700"}`}
+                                >
                                   Daily Mileage: {vehicle.dailyMileage ?? "N/A"}
                                 </span>
                               </div>
@@ -1478,353 +1629,520 @@ export default function ReservePage() {
                   </p>
                 )}
 
-            {!form.vehicleId && form.pickupDatetime && form.returnDatetime && vehicles.length > 0 && (
-              <p className="md:col-span-2 xl:col-span-4 text-sm text-amber-800">
-                Select an available vehicle to continue with guest details and payment.
-              </p>
-            )}
-
-            {form.vehicleId && (
-              <>
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-zinc-700">First Name</label>
-                  <input
-                    name="firstName"
-                    value={form.firstName}
-                    onChange={handleChange}
-                    className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                    required
-                  />
-                  {fieldErrors.firstName && <p className="mt-1 text-sm text-red-600">{fieldErrors.firstName}</p>}
-                </div>
-
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-zinc-700">Last Name</label>
-                  <input
-                    name="lastName"
-                    value={form.lastName}
-                    onChange={handleChange}
-                    className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                    required
-                  />
-                  {fieldErrors.lastName && <p className="mt-1 text-sm text-red-600">{fieldErrors.lastName}</p>}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block mb-1 text-sm font-medium text-zinc-700">Email</label>
-                  <p className="mb-1 text-xs text-zinc-600">
-                    We will send your reservation confirmation and other communications to this email.
+              {!form.vehicleId &&
+                form.pickupDatetime &&
+                form.returnDatetime &&
+                vehicles.length > 0 && (
+                  <p className="md:col-span-2 xl:col-span-4 text-sm text-amber-800">
+                    Select an available vehicle to continue with guest details
+                    and payment.
                   </p>
-                  <input
-                    name="email"
-                    type="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    onBlur={handleContactBlur}
-                    className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                    placeholder="you@example.com"
-                    required
-                  />
-                  {fieldErrors.email && <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>}
-                </div>
+                )}
 
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-zinc-700">Date of Birth</label>
-                  <input
-                    type="date"
-                    name="dateOfBirth"
-                    value={form.dateOfBirth}
-                    onChange={handleChange}
-                    max={maxDateOfBirth}
-                    className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                    required
-                  />
-                  {fieldErrors.dateOfBirth && (
-                    <p className="mt-1 text-sm text-red-600">{fieldErrors.dateOfBirth}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-zinc-700">Driver&apos;s License</label>
-                  <input
-                    name="driversLicenseNo"
-                    value={form.driversLicenseNo}
-                    onChange={handleChange}
-                    className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                    required
-                  />
-                  {fieldErrors.driversLicenseNo && (
-                    <p className="mt-1 text-sm text-red-600">{fieldErrors.driversLicenseNo}</p>
-                  )}
-                </div>
-
-                <div className="relative md:col-span-2 xl:col-span-4">
-                  <label className="block mb-1 text-sm font-medium text-zinc-700">Address</label>
-                  <input
-                    name="addressLine"
-                    value={form.addressLine}
-                    onChange={handleChange}
-                    className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                    placeholder="123 Main Street"
-                    required
-                  />
-                  {fieldErrors.addressLine && (
-                    <p className="mt-1 text-sm text-red-600">{fieldErrors.addressLine}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-zinc-700">City</label>
-                  <input
-                    name="city"
-                    value={form.city}
-                    onChange={handleChange}
-                    className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                    required
-                  />
-                  {fieldErrors.city && <p className="mt-1 text-sm text-red-600">{fieldErrors.city}</p>}
-                </div>
-
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-zinc-700">State</label>
-                  <select
-                    name="state"
-                    value={form.state}
-                    onChange={handleChange}
-                    className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                    required
-                  >
-                    <option value="">Select State</option>
-                    {US_STATES.map((state) => (
-                      <option key={state.code} value={state.code}>
-                        {state.name}
-                      </option>
-                    ))}
-                  </select>
-                  {fieldErrors.state && <p className="mt-1 text-sm text-red-600">{fieldErrors.state}</p>}
-                </div>
-
-                <div>
-                  <label className="block mb-1 text-sm font-medium text-zinc-700">Zip</label>
-                  <input
-                    name="zip"
-                    value={form.zip}
-                    onChange={handleChange}
-                    className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                    required
-                  />
-                  {fieldErrors.zip && <p className="mt-1 text-sm text-red-600">{fieldErrors.zip}</p>}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block mb-1 text-sm font-medium text-zinc-700">Phone</label>
-                  <input
-                    name="phone"
-                    type="tel"
-                    value={form.phone}
-                    onChange={handleChange}
-                    onBlur={handleContactBlur}
-                    className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                    placeholder="+1 555 123 4567"
-                    required
-                  />
-                  {fieldErrors.phone && <p className="mt-1 text-sm text-red-600">{fieldErrors.phone}</p>}
-                </div>
-
-                {lookupInFlight && <p className="md:col-span-2 xl:col-span-4 text-sm text-zinc-600">Checking existing customer details...</p>}
-                {lookupMessage && <p className="md:col-span-2 xl:col-span-4 text-sm text-emerald-700">{lookupMessage}</p>}
-
-                <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-emerald-300/40 bg-emerald-500/12 p-4 space-y-3 animate-stagger" style={{ "--anim-delay": "140ms" } as React.CSSProperties}>
-                  <p className="text-sm font-semibold text-emerald-900">Credit Card Payment (Test Mode)</p>
-                  <p className="text-xs text-emerald-800">
-                    This is a dummy payment step for now. Clicking the button below marks payment as confirmed so reservation can be completed.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                    <div className="md:col-span-2 xl:col-span-1">
-                      <label className="block mb-1 text-sm font-medium text-zinc-700">Cardholder Name</label>
-                      <input
-                        name="cardholderName"
-                        value={paymentForm.cardholderName}
-                        onChange={handlePaymentInputChange}
-                        className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                        placeholder="John Doe"
-                      />
-                      {fieldErrors.cardholderName && (
-                        <p className="mt-1 text-sm text-red-600">{fieldErrors.cardholderName}</p>
-                      )}
-                    </div>
-                    <div className="md:col-span-2 xl:col-span-1">
-                      <label className="block mb-1 text-sm font-medium text-zinc-700">Card Number</label>
-                      <input
-                        name="cardNumber"
-                        value={paymentForm.cardNumber}
-                        onChange={handlePaymentInputChange}
-                        className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                        placeholder="4242 4242 4242 4242"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-sm font-medium text-zinc-700">Expiry (MM/YY)</label>
-                      <input
-                        name="expiry"
-                        value={paymentForm.expiry}
-                        onChange={handlePaymentInputChange}
-                        className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                        placeholder="12/30"
-                      />
-                      {fieldErrors.expiry && (
-                        <p className="mt-1 text-sm text-red-600">{fieldErrors.expiry}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-sm font-medium text-zinc-700">CVV</label>
-                      <input
-                        name="cvv"
-                        value={paymentForm.cvv}
-                        onChange={handlePaymentInputChange}
-                        className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                        placeholder="123"
-                      />
-                      {fieldErrors.cvv && (
-                        <p className="mt-1 text-sm text-red-600">{fieldErrors.cvv}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {fieldErrors.paymentStatus && (
-                    <p className="text-sm text-red-600">{fieldErrors.paymentStatus}</p>
-                  )}
-                  {fieldErrors.paymentReference && (
-                    <p className="text-sm text-red-600">{fieldErrors.paymentReference}</p>
-                  )}
-                  {fieldErrors.paymentConfirmed && (
-                    <p className="text-sm text-red-600">{fieldErrors.paymentConfirmed}</p>
-                  )}
-
-                  {paymentMessage && <p className="text-sm text-emerald-900">{paymentMessage}</p>}
-
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleTestPayment}
-                      disabled={paying || !pricePreview}
-                      className="attention-bounce w-full sm:w-auto rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:-translate-y-0.5 disabled:opacity-60"
-                    >
-                      {paying ? "Confirming Demo Payment..." : "Confirm Demo Payment"}
-                    </button>
-                    {form.paymentConfirmed && (
-                      <span className="text-sm font-semibold text-emerald-900">Payment Confirmed</span>
+              {form.vehicleId && (
+                <>
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-zinc-700">
+                      First Name
+                    </label>
+                    <input
+                      name="firstName"
+                      value={form.firstName}
+                      onChange={handleChange}
+                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      required
+                    />
+                    {fieldErrors.firstName && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.firstName}
+                      </p>
                     )}
                   </div>
-                </div>
 
-                <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-amber-900/15 bg-white/75 p-4 space-y-3 backdrop-blur animate-stagger" style={{ "--anim-delay": "200ms" } as React.CSSProperties}>
-                  <p className="text-sm font-semibold text-zinc-900">Georgia Rental Terms Acceptance</p>
-                  <p className="text-xs text-zinc-600">
-                    This electronic acceptance applies to Booking #{form.paymentReference || "Pending"} for {selectedVehicle?.make} {selectedVehicle?.model}.
-                  </p>
-                  <div className="grid grid-cols-1 gap-3 text-xs text-zinc-600 md:grid-cols-2">
-                    <p>Guest: {`${form.firstName} ${form.lastName}`.trim() || "-"}</p>
-                    <p>Email: {form.email || "-"}</p>
-                    <p>Phone: {form.phone || "-"}</p>
-                    <p>Vehicle: {selectedVehicle ? `${selectedVehicle.make} ${selectedVehicle.model}` : "-"}</p>
-                    <p>Pickup: {form.pickupDatetime || "-"}</p>
-                    <p>Return: {form.returnDatetime || "-"}</p>
-                    <p>Estimated Total: {pricePreview ? `$${pricePreview.total.toFixed(2)}` : "-"}</p>
-                    <p>Venue: Georgia</p>
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-zinc-700">
+                      Last Name
+                    </label>
+                    <input
+                      name="lastName"
+                      value={form.lastName}
+                      onChange={handleChange}
+                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      required
+                    />
+                    {fieldErrors.lastName && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.lastName}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    <a
-                      href="/ga-rental-terms"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-lg border border-amber-900/20 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-amber-50"
+                  <div className="md:col-span-2">
+                    <label className="block mb-1 text-sm font-medium text-zinc-700">
+                      Email
+                    </label>
+                    <p className="mb-1 text-xs text-zinc-600">
+                      We will send your reservation confirmation and other
+                      communications to this email.
+                    </p>
+                    <input
+                      name="email"
+                      type="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      onBlur={handleContactBlur}
+                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      placeholder="you@example.com"
+                      required
+                    />
+                    {fieldErrors.email && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.email}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-zinc-700">
+                      Date of Birth
+                    </label>
+                    <input
+                      type="date"
+                      name="dateOfBirth"
+                      value={form.dateOfBirth}
+                      onChange={handleChange}
+                      max={maxDateOfBirth}
+                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      required
+                    />
+                    {fieldErrors.dateOfBirth && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.dateOfBirth}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-zinc-700">
+                      Driver&apos;s License
+                    </label>
+                    <input
+                      name="driversLicenseNo"
+                      value={form.driversLicenseNo}
+                      onChange={handleChange}
+                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      required
+                    />
+                    {fieldErrors.driversLicenseNo && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.driversLicenseNo}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="relative md:col-span-2 xl:col-span-4">
+                    <label className="block mb-1 text-sm font-medium text-zinc-700">
+                      Address
+                    </label>
+                    <input
+                      name="addressLine"
+                      value={form.addressLine}
+                      onChange={handleChange}
+                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      placeholder="123 Main Street"
+                      required
+                    />
+                    {fieldErrors.addressLine && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.addressLine}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-zinc-700">
+                      City
+                    </label>
+                    <input
+                      name="city"
+                      value={form.city}
+                      onChange={handleChange}
+                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      required
+                    />
+                    {fieldErrors.city && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.city}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-zinc-700">
+                      State
+                    </label>
+                    <select
+                      name="state"
+                      value={form.state}
+                      onChange={handleChange}
+                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      required
                     >
-                      View Full Georgia Terms
-                    </a>
-                    <span className="text-xs text-zinc-600">Open the terms link to review full conditions.</span>
+                      <option value="">Select State</option>
+                      {US_STATES.map((state) => (
+                        <option key={state.code} value={state.code}>
+                          {state.name}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.state && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.state}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="flex items-start gap-2 text-sm text-zinc-800">
-                      <input
-                        type="checkbox"
-                        checked={termsChecks.accuracy}
-                        onChange={(e) => {
-                          setTermsChecks((prev) => ({ ...prev, accuracy: e.target.checked }));
-                          setFieldErrors((prev) => ({ ...prev, termsAccepted: "" }));
-                        }}
-                        className="mt-0.5"
-                      />
-                      I confirm all booking and driver details are accurate.
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-zinc-700">
+                      Zip
                     </label>
-                    <label className="flex items-start gap-2 text-sm text-zinc-800">
-                      <input
-                        type="checkbox"
-                        checked={termsChecks.agreement}
-                        onChange={(e) => {
-                          setTermsChecks((prev) => ({ ...prev, agreement: e.target.checked }));
-                          setFieldErrors((prev) => ({ ...prev, termsAccepted: "" }));
-                        }}
-                        className="mt-0.5"
-                      />
-                      I have read and agree to the Georgia Vehicle Rental Terms and Conditions.
-                    </label>
-                    <label className="flex items-start gap-2 text-sm text-zinc-800">
-                      <input
-                        type="checkbox"
-                        checked={termsChecks.authorization}
-                        onChange={(e) => {
-                          setTermsChecks((prev) => ({ ...prev, authorization: e.target.checked }));
-                          setFieldErrors((prev) => ({ ...prev, termsAccepted: "" }));
-                        }}
-                        className="mt-0.5"
-                      />
-                      I authorize charges for rental, lawful fees, and incidentals under this booking.
-                    </label>
-                    <label className="flex items-start gap-2 text-sm text-zinc-800">
-                      <input
-                        type="checkbox"
-                        checked={termsChecks.esign}
-                        onChange={(e) => {
-                          setTermsChecks((prev) => ({ ...prev, esign: e.target.checked }));
-                          setFieldErrors((prev) => ({ ...prev, termsAccepted: "" }));
-                        }}
-                        className="mt-0.5"
-                      />
-                      I understand this checkmark acceptance is my electronic signature.
-                    </label>
+                    <input
+                      name="zip"
+                      value={form.zip}
+                      onChange={handleChange}
+                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      required
+                    />
+                    {fieldErrors.zip && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.zip}
+                      </p>
+                    )}
                   </div>
 
-                  {fieldErrors.termsAccepted && (
-                    <p className="text-sm text-red-600">{fieldErrors.termsAccepted}</p>
+                  <div className="md:col-span-2">
+                    <label className="block mb-1 text-sm font-medium text-zinc-700">
+                      Phone
+                    </label>
+                    <input
+                      name="phone"
+                      type="tel"
+                      value={form.phone}
+                      onChange={handleChange}
+                      onBlur={handleContactBlur}
+                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      placeholder="+1 555 123 4567"
+                      required
+                    />
+                    {fieldErrors.phone && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.phone}
+                      </p>
+                    )}
+                  </div>
+
+                  {lookupInFlight && (
+                    <p className="md:col-span-2 xl:col-span-4 text-sm text-zinc-600">
+                      Checking existing customer details...
+                    </p>
                   )}
-                </div>
+                  {lookupMessage && (
+                    <p className="md:col-span-2 xl:col-span-4 text-sm text-emerald-700">
+                      {lookupMessage}
+                    </p>
+                  )}
 
-                <button
-                  type="submit"
-                  disabled={submitting || loadingVehicles || !form.paymentConfirmed || !allTermsAccepted}
-                  className="attention-bounce md:col-span-2 xl:col-span-4 w-full rounded-xl bg-[var(--color-accent)] px-4 py-3 font-semibold text-[var(--color-ink)] transition hover:-translate-y-0.5 disabled:opacity-60"
-                >
-                  {submitting ? "Submitting Reservation..." : "Confirm Reservation"}
-                </button>
-              </>
-            )}
+                  <div
+                    className="md:col-span-2 xl:col-span-4 rounded-2xl border border-emerald-300/40 bg-emerald-500/12 p-4 space-y-3 animate-stagger"
+                    style={{ "--anim-delay": "140ms" } as React.CSSProperties}
+                  >
+                    <p className="text-sm font-semibold text-emerald-900">
+                      Credit Card Payment (Test Mode)
+                    </p>
+                    <p className="text-xs text-emerald-800">
+                      This is a dummy payment step for now. Clicking the button
+                      below marks payment as confirmed so reservation can be
+                      completed.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                      <div className="md:col-span-2 xl:col-span-1">
+                        <label className="block mb-1 text-sm font-medium text-zinc-700">
+                          Cardholder Name
+                        </label>
+                        <input
+                          name="cardholderName"
+                          value={paymentForm.cardholderName}
+                          onChange={handlePaymentInputChange}
+                          className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                          placeholder="John Doe"
+                        />
+                        {fieldErrors.cardholderName && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {fieldErrors.cardholderName}
+                          </p>
+                        )}
+                      </div>
+                      <div className="md:col-span-2 xl:col-span-1">
+                        <label className="block mb-1 text-sm font-medium text-zinc-700">
+                          Card Number
+                        </label>
+                        <input
+                          name="cardNumber"
+                          value={paymentForm.cardNumber}
+                          onChange={handlePaymentInputChange}
+                          className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                          placeholder="4242 4242 4242 4242"
+                        />
+                      </div>
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-zinc-700">
+                          Expiry (MM/YY)
+                        </label>
+                        <input
+                          name="expiry"
+                          value={paymentForm.expiry}
+                          onChange={handlePaymentInputChange}
+                          className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                          placeholder="12/30"
+                        />
+                        {fieldErrors.expiry && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {fieldErrors.expiry}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block mb-1 text-sm font-medium text-zinc-700">
+                          CVV
+                        </label>
+                        <input
+                          name="cvv"
+                          value={paymentForm.cvv}
+                          onChange={handlePaymentInputChange}
+                          className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                          placeholder="123"
+                        />
+                        {fieldErrors.cvv && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {fieldErrors.cvv}
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
+                    {fieldErrors.paymentStatus && (
+                      <p className="text-sm text-red-600">
+                        {fieldErrors.paymentStatus}
+                      </p>
+                    )}
+                    {fieldErrors.paymentReference && (
+                      <p className="text-sm text-red-600">
+                        {fieldErrors.paymentReference}
+                      </p>
+                    )}
+                    {fieldErrors.paymentConfirmed && (
+                      <p className="text-sm text-red-600">
+                        {fieldErrors.paymentConfirmed}
+                      </p>
+                    )}
+
+                    {paymentMessage && (
+                      <p className="text-sm text-emerald-900">
+                        {paymentMessage}
+                      </p>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleTestPayment}
+                        disabled={paying || !pricePreview}
+                        className="attention-bounce w-full sm:w-auto rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:-translate-y-0.5 disabled:opacity-60"
+                      >
+                        {paying
+                          ? "Confirming Demo Payment..."
+                          : "Confirm Demo Payment"}
+                      </button>
+                      {form.paymentConfirmed && (
+                        <span className="text-sm font-semibold text-emerald-900">
+                          Payment Confirmed
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    className="md:col-span-2 xl:col-span-4 rounded-2xl border border-amber-900/15 bg-white/75 p-4 space-y-3 backdrop-blur animate-stagger"
+                    style={{ "--anim-delay": "200ms" } as React.CSSProperties}
+                  >
+                    <p className="text-sm font-semibold text-zinc-900">
+                      Georgia Rental Terms Acceptance
+                    </p>
+                    <p className="text-xs text-zinc-600">
+                      This electronic acceptance applies to Booking #
+                      {form.paymentReference || "Pending"} for{" "}
+                      {selectedVehicle?.make} {selectedVehicle?.model}.
+                    </p>
+                    <div className="grid grid-cols-1 gap-3 text-xs text-zinc-600 md:grid-cols-2">
+                      <p>
+                        Guest:{" "}
+                        {`${form.firstName} ${form.lastName}`.trim() || "-"}
+                      </p>
+                      <p>Email: {form.email || "-"}</p>
+                      <p>Phone: {form.phone || "-"}</p>
+                      <p>
+                        Vehicle:{" "}
+                        {selectedVehicle
+                          ? `${selectedVehicle.make} ${selectedVehicle.model}`
+                          : "-"}
+                      </p>
+                      <p>Pickup: {form.pickupDatetime || "-"}</p>
+                      <p>Return: {form.returnDatetime || "-"}</p>
+                      <p>
+                        Estimated Total:{" "}
+                        {pricePreview
+                          ? `$${pricePreview.total.toFixed(2)}`
+                          : "-"}
+                      </p>
+                      <p>Venue: Georgia</p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <a
+                        href="/ga-rental-terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-lg border border-amber-900/20 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-amber-50"
+                      >
+                        View Full Georgia Terms
+                      </a>
+                      <span className="text-xs text-zinc-600">
+                        Open the terms link to review full conditions.
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-2 text-sm text-zinc-800">
+                        <input
+                          type="checkbox"
+                          checked={termsChecks.accuracy}
+                          onChange={(e) => {
+                            setTermsChecks((prev) => ({
+                              ...prev,
+                              accuracy: e.target.checked,
+                            }));
+                            setFieldErrors((prev) => ({
+                              ...prev,
+                              termsAccepted: "",
+                            }));
+                          }}
+                          className="mt-0.5"
+                        />
+                        I confirm all booking and driver details are accurate.
+                      </label>
+                      <label className="flex items-start gap-2 text-sm text-zinc-800">
+                        <input
+                          type="checkbox"
+                          checked={termsChecks.agreement}
+                          onChange={(e) => {
+                            setTermsChecks((prev) => ({
+                              ...prev,
+                              agreement: e.target.checked,
+                            }));
+                            setFieldErrors((prev) => ({
+                              ...prev,
+                              termsAccepted: "",
+                            }));
+                          }}
+                          className="mt-0.5"
+                        />
+                        I have read and agree to the Georgia Vehicle Rental
+                        Terms and Conditions.
+                      </label>
+                      <label className="flex items-start gap-2 text-sm text-zinc-800">
+                        <input
+                          type="checkbox"
+                          checked={termsChecks.authorization}
+                          onChange={(e) => {
+                            setTermsChecks((prev) => ({
+                              ...prev,
+                              authorization: e.target.checked,
+                            }));
+                            setFieldErrors((prev) => ({
+                              ...prev,
+                              termsAccepted: "",
+                            }));
+                          }}
+                          className="mt-0.5"
+                        />
+                        I authorize charges for rental, lawful fees, and
+                        incidentals under this booking.
+                      </label>
+                      <label className="flex items-start gap-2 text-sm text-zinc-800">
+                        <input
+                          type="checkbox"
+                          checked={termsChecks.esign}
+                          onChange={(e) => {
+                            setTermsChecks((prev) => ({
+                              ...prev,
+                              esign: e.target.checked,
+                            }));
+                            setFieldErrors((prev) => ({
+                              ...prev,
+                              termsAccepted: "",
+                            }));
+                          }}
+                          className="mt-0.5"
+                        />
+                        I understand this checkmark acceptance is my electronic
+                        signature.
+                      </label>
+                    </div>
+
+                    {fieldErrors.termsAccepted && (
+                      <p className="text-sm text-red-600">
+                        {fieldErrors.termsAccepted}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={
+                      submitting ||
+                      loadingVehicles ||
+                      !form.paymentConfirmed ||
+                      !allTermsAccepted
+                    }
+                    className="attention-bounce md:col-span-2 xl:col-span-4 w-full rounded-xl bg-[var(--color-accent)] px-4 py-3 font-semibold text-[var(--color-ink)] transition hover:-translate-y-0.5 disabled:opacity-60"
+                  >
+                    {submitting
+                      ? "Submitting Reservation..."
+                      : "Confirm Reservation"}
+                  </button>
+                </>
+              )}
             </div>
 
-            {error && <p className="md:col-span-2 xl:col-span-4 text-sm text-red-700">{error}</p>}
+            {error && (
+              <p className="md:col-span-2 xl:col-span-4 text-sm text-red-700">
+                {error}
+              </p>
+            )}
           </form>
         </section>
 
-        <section className={`fade-up-delayed float-soft-delayed h-fit rounded-3xl border p-6 shadow-[0_30px_64px_-34px_rgba(245,191,98,0.85)] sm:p-8 lg:sticky lg:top-24 lg:col-span-1 ${
-          isNightTheme
-            ? "border-slate-200/20 bg-[linear-gradient(170deg,rgba(15,23,42,0.9),rgba(30,41,59,0.82))] text-slate-100"
-            : "border-white/20 bg-[linear-gradient(170deg,rgba(249,240,223,0.97),rgba(253,246,233,0.93))] text-zinc-900"
-        }`}>
+        <section
+          className={`fade-up-delayed float-soft-delayed h-fit rounded-3xl border p-6 shadow-[0_30px_64px_-34px_rgba(245,191,98,0.85)] sm:p-8 lg:sticky lg:top-24 lg:col-span-1 ${
+            isNightTheme
+              ? "border-slate-200/20 bg-[linear-gradient(170deg,rgba(15,23,42,0.9),rgba(30,41,59,0.82))] text-slate-100"
+              : "border-white/20 bg-[linear-gradient(170deg,rgba(249,240,223,0.97),rgba(253,246,233,0.93))] text-zinc-900"
+          }`}
+        >
           <h2 className="text-2xl font-bold">Reservation Preview</h2>
-          <p className="mt-2 text-sm text-zinc-600">Live estimate based on your selected vehicle and dates.</p>
+          <p className="mt-2 text-sm text-zinc-600">
+            Live estimate based on your selected vehicle and dates.
+          </p>
 
           {selectedVehicle && pricePreview ? (
             <div className="mt-6 space-y-3">
@@ -1833,19 +2151,28 @@ export default function ReservePage() {
                 <p className="text-lg font-semibold mt-1">
                   {selectedVehicle.make} {selectedVehicle.model}
                 </p>
-                <p className="text-sm text-zinc-500">Plate: {selectedVehicle.plateNumber}</p>
+                <p className="text-sm text-zinc-500">
+                  Plate: {selectedVehicle.plateNumber}
+                </p>
               </div>
 
               <div className="rounded-2xl border border-amber-300/45 bg-white/85 p-4 text-sm text-zinc-700 space-y-2">
                 <div className="flex justify-between">
                   <span>
-                    Rental (<em>${pricePreview.dailyRate.toFixed(2)} x {pricePreview.days} days</em>)
+                    Rental (
+                    <em>
+                      ${pricePreview.dailyRate.toFixed(2)} x {pricePreview.days}{" "}
+                      days
+                    </em>
+                    )
                   </span>
                   <span>${pricePreview.rentalSubtotal.toFixed(2)}</span>
                 </div>
                 {pricePreview.discountPercentage > 0 && (
                   <div className="flex justify-between text-green-700">
-                    <span>Long booking discount ({pricePreview.discountPercentage}%)</span>
+                    <span>
+                      Long booking discount ({pricePreview.discountPercentage}%)
+                    </span>
                     <span>-${pricePreview.rentalDiscount.toFixed(2)}</span>
                   </div>
                 )}
@@ -1875,12 +2202,14 @@ export default function ReservePage() {
             </div>
           ) : (
             <div className="mt-6 rounded-2xl border border-dashed border-zinc-300 p-6 text-sm text-zinc-500">
-              Enter your details and choose dates to see available vehicles and pricing.
+              Enter your details and choose dates to see available vehicles and
+              pricing.
             </div>
           )}
 
           <p className="mt-6 text-xs text-zinc-500">
-            Price preview is informational. Final totals are validated and calculated by the backend on submission.
+            Price preview is informational. Final totals are validated and
+            calculated by the backend on submission.
           </p>
         </section>
       </div>
@@ -1892,14 +2221,21 @@ export default function ReservePage() {
             : "border-amber-900/15 bg-white/80"
         }`}
       >
-        <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${isNightTheme ? "text-amber-300" : "text-[var(--color-accent-deep)]"}`}>
+        <p
+          className={`text-xs font-semibold uppercase tracking-[0.22em] ${isNightTheme ? "text-amber-300" : "text-[var(--color-accent-deep)]"}`}
+        >
           Carsgidi
         </p>
-        <h2 className={`mt-3 text-3xl font-black leading-tight sm:text-4xl ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+        <h2
+          className={`mt-3 text-3xl font-black leading-tight sm:text-4xl ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+        >
           Find. Book. Drive
         </h2>
-        <p className={`mt-4 max-w-2xl leading-relaxed ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}>
-          Reserve your ride in minutes. Book clean, reliable vehicles with transparent pricing and instant confirmation.
+        <p
+          className={`mt-4 max-w-2xl leading-relaxed ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}
+        >
+          Reserve your ride in minutes. Book clean, reliable vehicles with
+          transparent pricing and instant confirmation.
         </p>
 
         <div className="mt-5 flex flex-wrap gap-2 text-sm font-semibold">
@@ -1910,8 +2246,19 @@ export default function ReservePage() {
                 : "border-amber-300/45 bg-white/75 text-zinc-800"
             }`}
           >
-            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-amber-500" aria-hidden="true">
-              <path d="M5 12.5 9.5 17 19 7.5" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-4 w-4 text-amber-500"
+              aria-hidden="true"
+            >
+              <path
+                d="M5 12.5 9.5 17 19 7.5"
+                stroke="currentColor"
+                strokeWidth="2.1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             Flexible
           </span>
@@ -1922,9 +2269,26 @@ export default function ReservePage() {
                 : "border-sky-300/45 bg-white/75 text-zinc-800"
             }`}
           >
-            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-sky-500" aria-hidden="true">
-              <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
-              <path d="M12 8v4l2.8 1.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-4 w-4 text-sky-500"
+              aria-hidden="true"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="8"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <path
+                d="M12 8v4l2.8 1.8"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             Instant
           </span>
@@ -1935,9 +2299,25 @@ export default function ReservePage() {
                 : "border-emerald-300/45 bg-white/75 text-zinc-800"
             }`}
           >
-            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-emerald-500" aria-hidden="true">
-              <path d="M3.5 14h17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              <path d="M7 14v-1.8A3.2 3.2 0 0 1 10.2 9h3.6A3.2 3.2 0 0 1 17 12.2V14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-4 w-4 text-emerald-500"
+              aria-hidden="true"
+            >
+              <path
+                d="M3.5 14h17"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M7 14v-1.8A3.2 3.2 0 0 1 10.2 9h3.6A3.2 3.2 0 0 1 17 12.2V14"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
               <circle cx="7.5" cy="16.5" r="1.3" fill="currentColor" />
               <circle cx="16.5" cy="16.5" r="1.3" fill="currentColor" />
             </svg>
@@ -1948,55 +2328,93 @@ export default function ReservePage() {
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <article
             className={`flex min-h-[120px] flex-col justify-center rounded-2xl border px-5 py-4 ${
-              isNightTheme ? "border-slate-200/20 bg-white/10" : "border-amber-900/15 bg-white/75"
+              isNightTheme
+                ? "border-slate-200/20 bg-white/10"
+                : "border-amber-900/15 bg-white/75"
             }`}
           >
-            <p className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+            <p
+              className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+            >
               200+
             </p>
-            <p className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}>
+            <p
+              className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}
+            >
               Trips Completed
             </p>
           </article>
           <article
             className={`flex min-h-[120px] flex-col justify-center rounded-2xl border px-5 py-4 ${
-              isNightTheme ? "border-slate-200/20 bg-white/10" : "border-amber-900/15 bg-white/75"
+              isNightTheme
+                ? "border-slate-200/20 bg-white/10"
+                : "border-amber-900/15 bg-white/75"
             }`}
           >
-            <p className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+            <p
+              className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+            >
               24/7
             </p>
-            <p className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}>
+            <p
+              className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}
+            >
               Customer Support
             </p>
           </article>
           <article
             className={`flex min-h-[120px] flex-col justify-center rounded-2xl border px-5 py-4 ${
-              isNightTheme ? "border-slate-200/20 bg-white/10" : "border-amber-900/15 bg-white/75"
+              isNightTheme
+                ? "border-slate-200/20 bg-white/10"
+                : "border-amber-900/15 bg-white/75"
             }`}
           >
-            <p className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+            <p
+              className={`text-3xl font-black leading-none sm:text-[2rem] ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+            >
               10+
             </p>
-            <p className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}>
+            <p
+              className={`mt-2 text-base ${isNightTheme ? "text-slate-200" : "text-zinc-700"}`}
+            >
               Vehicles in Fleet
             </p>
           </article>
         </div>
       </section>
 
-      <footer className={`relative mt-6 border-t px-3 py-2.5 text-center text-xs backdrop-blur-xl sm:fixed sm:bottom-0 sm:left-0 sm:right-0 sm:z-40 sm:px-4 sm:py-3 sm:text-sm ${
-        isNightTheme
-          ? "border-slate-300/20 bg-[rgba(10,16,30,0.88)] text-slate-100"
-          : "border-amber-900/15 bg-[rgba(255,248,237,0.94)] text-zinc-900"
-      }`}>
+      <footer
+        className={`relative mt-6 border-t px-3 py-2.5 text-center text-xs backdrop-blur-xl sm:fixed sm:bottom-0 sm:left-0 sm:right-0 sm:z-40 sm:px-4 sm:py-3 sm:text-sm ${
+          isNightTheme
+            ? "border-slate-300/20 bg-[rgba(10,16,30,0.88)] text-slate-100"
+            : "border-amber-900/15 bg-[rgba(255,248,237,0.94)] text-zinc-900"
+        }`}
+      >
         <div className="mx-auto w-full max-w-7xl">
-          <p className={`font-semibold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>Need help with your reservation?</p>
+          <p
+            className={`font-semibold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+          >
+            Need help with your reservation?
+          </p>
           <div className="mt-1 flex flex-col items-center gap-1 sm:flex-row sm:flex-wrap sm:justify-center sm:items-center sm:gap-4">
-            <a href="mailto:support@carsgidi.com" className={isNightTheme ? "text-slate-200 hover:text-white" : "text-zinc-800 hover:text-zinc-600"}>
+            <a
+              href="mailto:support@carsgidi.com"
+              className={
+                isNightTheme
+                  ? "text-slate-200 hover:text-white"
+                  : "text-zinc-800 hover:text-zinc-600"
+              }
+            >
               support@carsgidi.com
             </a>
-            <a href="tel:+14702382358" className={isNightTheme ? "text-slate-200 hover:text-white" : "text-zinc-800 hover:text-zinc-600"}>
+            <a
+              href="tel:+14702382358"
+              className={
+                isNightTheme
+                  ? "text-slate-200 hover:text-white"
+                  : "text-zinc-800 hover:text-zinc-600"
+              }
+            >
               +1 (470) 238-2358
             </a>
           </div>
@@ -2010,19 +2428,45 @@ export default function ReservePage() {
           aria-labelledby="confirm-modal-title"
           className="fixed inset-0 z-[80] flex items-center justify-center p-4"
         >
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (!cancelling) { setConfirmationDetails(null); setCancelConfirmStep(false); setCancelError(""); } }} />
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => {
+              if (!cancelling) {
+                setConfirmationDetails(null);
+                setCancelConfirmStep(false);
+                setCancelError("");
+              }
+            }}
+          />
           <div className="relative w-full max-w-md overflow-y-auto max-h-[90vh] rounded-3xl border border-emerald-300/50 bg-white p-6 shadow-[0_32px_80px_-24px_rgba(0,0,0,0.55)] sm:p-8">
-
             {/* Header */}
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6 text-emerald-600" aria-hidden="true">
-                  <path d="M5 12.5 9.5 17 19 7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="h-6 w-6 text-emerald-600"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M5 12.5 9.5 17 19 7.5"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </div>
               <div>
-                <h2 id="confirm-modal-title" className="text-lg font-bold text-zinc-900">Reservation Confirmed</h2>
-                <p className="text-sm text-zinc-500">Booking #{confirmationDetails.bookingId}</p>
+                <h2
+                  id="confirm-modal-title"
+                  className="text-lg font-bold text-zinc-900"
+                >
+                  Reservation Confirmed
+                </h2>
+                <p className="text-sm text-zinc-500">
+                  Trip ID {formatBookingId(confirmationDetails.bookingId)}
+                </p>
               </div>
             </div>
 
@@ -2030,123 +2474,112 @@ export default function ReservePage() {
             <div className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm">
               <div className="flex justify-between">
                 <span className="text-zinc-500">Trip ID</span>
-                <span className="font-mono font-semibold text-zinc-900">#{confirmationDetails.bookingId}</span>
+                <span className="font-mono font-semibold text-zinc-900 break-all text-right">
+                  {formatBookingId(confirmationDetails.bookingId)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Guest</span>
-                <span className="font-medium text-zinc-900">{confirmationDetails.firstName} {confirmationDetails.lastName}</span>
+                <span className="font-medium text-zinc-900">
+                  {confirmationDetails.firstName} {confirmationDetails.lastName}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Vehicle</span>
-                <span className="font-medium text-zinc-900">{confirmationDetails.vehicleMake} {confirmationDetails.vehicleModel}</span>
+                <span className="font-medium text-zinc-900">
+                  {confirmationDetails.vehicleMake}{" "}
+                  {confirmationDetails.vehicleModel}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Plate</span>
-                <span className="font-medium text-zinc-900">{confirmationDetails.vehiclePlate}</span>
+                <span className="font-medium text-zinc-900">
+                  {confirmationDetails.vehiclePlate}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Pickup</span>
-                <span className="font-medium text-zinc-900">{new Date(confirmationDetails.pickupDatetime).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>
+                <span className="font-medium text-zinc-900">
+                  {new Date(confirmationDetails.pickupDatetime).toLocaleString(
+                    [],
+                    { dateStyle: "medium", timeStyle: "short" },
+                  )}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Return</span>
-                <span className="font-medium text-zinc-900">{new Date(confirmationDetails.returnDatetime).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>
+                <span className="font-medium text-zinc-900">
+                  {new Date(confirmationDetails.returnDatetime).toLocaleString(
+                    [],
+                    { dateStyle: "medium", timeStyle: "short" },
+                  )}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Pickup location</span>
-                <span className="font-medium text-zinc-900">{confirmationDetails.pickupLocation}</span>
+                <span className="font-medium text-zinc-900">
+                  {confirmationDetails.pickupLocation}
+                </span>
               </div>
               <div className="flex justify-between border-t border-zinc-200 pt-3">
                 <span className="text-zinc-500">Total charged</span>
-                <span className="font-bold text-zinc-900">${confirmationDetails.total.toFixed(2)}</span>
+                <span className="font-bold text-zinc-900">
+                  ${confirmationDetails.total.toFixed(2)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500">Payment ref</span>
-                <span className="font-medium text-zinc-900 break-all text-right">{confirmationDetails.paymentReference}</span>
+                <span className="font-medium text-zinc-900 break-all text-right">
+                  {confirmationDetails.paymentReference}
+                </span>
               </div>
             </div>
 
-            {(confirmationDetails.emailMessage || confirmationDetails.smsMessage) && (
+            {(confirmationDetails.emailMessage ||
+              confirmationDetails.smsMessage) && (
               <div className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
-                {confirmationDetails.emailMessage && <p>{confirmationDetails.emailMessage}</p>}
-                {confirmationDetails.smsMessage && <p className="mt-1">{confirmationDetails.smsMessage}</p>}
+                {confirmationDetails.emailMessage && (
+                  <p>{confirmationDetails.emailMessage}</p>
+                )}
+                {confirmationDetails.smsMessage && (
+                  <p className="mt-1">{confirmationDetails.smsMessage}</p>
+                )}
               </div>
             )}
 
-            {/* Cancel confirmation step */}
-            {cancelConfirmStep ? (
-              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
-                <p className="text-sm font-semibold text-red-800">Cancel this reservation?</p>
-                <p className="mt-1 text-sm text-red-700">This will permanently delete booking #{confirmationDetails.bookingId}. This cannot be undone.</p>
-                {cancelError && <p className="mt-2 text-sm text-red-600">{cancelError}</p>}
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    disabled={cancelling}
-                    onClick={async () => {
-                      if (!confirmationDetails.deletionToken) return;
-                      setCancelError("");
-                      setCancelling(true);
-                      try {
-                        await api.delete(`/public/reservations/${confirmationDetails.bookingId}`, {
-                          data: { deletionToken: confirmationDetails.deletionToken },
-                        });
-                        setConfirmationDetails(null);
-                        setCancelConfirmStep(false);
-                      } catch (err: unknown) {
-                        const msg =
-                          err && typeof err === "object" && "response" in err
-                            ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-                            : undefined;
-                        setCancelError(msg || "Failed to cancel reservation. Please contact support.");
-                      } finally {
-                        setCancelling(false);
-                      }
-                    }}
-                    className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
-                  >
-                    {cancelling ? "Cancelling..." : "Yes, cancel reservation"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={cancelling}
-                    onClick={() => { setCancelConfirmStep(false); setCancelError(""); }}
-                    className="flex-1 rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-60"
-                  >
-                    Keep reservation
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-5 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setConfirmationDetails(null); setCancelConfirmStep(false); setCancelError(""); }}
-                  className="w-full rounded-xl bg-[var(--color-accent)] px-4 py-3 font-semibold text-zinc-900 transition hover:brightness-95"
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmationDetails(null);
+                  setCancelConfirmStep(false);
+                  setCancelError("");
+                }}
+                className="w-full rounded-xl bg-[var(--color-accent)] px-4 py-3 font-semibold text-zinc-900 transition hover:brightness-95"
+              >
+                Done
+              </button>
+              {confirmationDetails.manageToken && (
+                <a
+                  href={`/guest-manage/${confirmationDetails.manageToken}?action=modify`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-center text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
                 >
-                  Done
-                </button>
-                {confirmationDetails.manageToken && (
-                  <a
-                    href={`/guest-manage/${confirmationDetails.manageToken}?action=modify`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-center text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
-                  >
-                    Modify reservation
-                  </a>
-                )}
-                {confirmationDetails.deletionToken && (
-                  <button
-                    type="button"
-                    onClick={() => setCancelConfirmStep(true)}
-                    className="w-full rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                  >
-                    Cancel reservation
-                  </button>
-                )}
-              </div>
-            )}
+                  Modify reservation
+                </a>
+              )}
+              {confirmationDetails.manageToken && (
+                <a
+                  href={`/guest-manage/${confirmationDetails.manageToken}?action=cancel`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full rounded-xl border border-red-200 bg-white px-4 py-3 text-center text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                >
+                  Cancel reservation
+                </a>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -2168,10 +2601,14 @@ export default function ReservePage() {
               }`}
             >
               <div>
-                <p className={`text-sm font-semibold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}>
+                <p
+                  className={`text-sm font-semibold ${isNightTheme ? "text-slate-100" : "text-zinc-900"}`}
+                >
                   Guest FAQ Assistant
                 </p>
-                <p className={`text-[11px] ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}>
+                <p
+                  className={`text-[11px] ${isNightTheme ? "text-slate-300" : "text-zinc-600"}`}
+                >
                   Instant answers for common reservation questions
                 </p>
               </div>
@@ -2179,7 +2616,9 @@ export default function ReservePage() {
                 type="button"
                 onClick={() => setIsFaqChatOpen(false)}
                 className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-                  isNightTheme ? "text-slate-200 hover:bg-white/10" : "text-zinc-600 hover:bg-white"
+                  isNightTheme
+                    ? "text-slate-200 hover:bg-white/10"
+                    : "text-zinc-600 hover:bg-white"
                 }`}
               >
                 Close
@@ -2199,8 +2638,8 @@ export default function ReservePage() {
                     message.role === "user"
                       ? "ml-auto bg-[var(--color-accent)] text-zinc-900"
                       : isNightTheme
-                      ? "mr-auto bg-white/10 text-slate-100"
-                      : "mr-auto bg-white text-zinc-800 border border-zinc-200/80"
+                        ? "mr-auto bg-white/10 text-slate-100"
+                        : "mr-auto bg-white text-zinc-800 border border-zinc-200/80"
                   }`}
                 >
                   {message.text}
@@ -2230,7 +2669,10 @@ export default function ReservePage() {
                 ))}
               </div>
 
-              <form onSubmit={handleFaqSubmit} className="flex items-center gap-2">
+              <form
+                onSubmit={handleFaqSubmit}
+                className="flex items-center gap-2"
+              >
                 <input
                   type="text"
                   value={chatInput}

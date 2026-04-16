@@ -166,7 +166,7 @@ export default function BookingsPage() {
     }
 
     if (normalized === "active") {
-      return "bg-blue-100 text-blue-700";
+      return "bg-emerald-100 text-emerald-700";
     }
 
     if (normalized === "completed") {
@@ -246,14 +246,14 @@ export default function BookingsPage() {
   const fetchOtherBookings = async () => {
     try {
       setOtherLoading(true);
-      const res = await api.get("/bookings", {
-        params: {
-          status: "other",
-          page: otherPage,
-          limit,
-          search: searchTerm.trim() || undefined,
-        },
-      });
+        const res = await api.get("/bookings", {
+          params: {
+            status: "other",
+            page: otherPage,
+            limit,
+            search: otherSearch.trim() || undefined,
+          },
+        });
 
       const payload = res.data || {};
       const nextData = payload.data || [];
@@ -348,19 +348,34 @@ export default function BookingsPage() {
         </td>
 
         <td className="px-2 py-1.5 whitespace-nowrap">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              sendPrecheckoutPrompt(booking.id);
-            }}
-            disabled={sendingPrecheckoutId === booking.id}
-            className="bg-purple-600 text-white px-3 py-1 rounded inline-block disabled:opacity-60"
-          >
-            {sendingPrecheckoutId === booking.id
-              ? "Sending..."
-              : "Send Pre-checkout"}
-          </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sendPrecheckoutPrompt(booking.id);
+                }}
+                disabled={sendingPrecheckoutId === booking.id}
+                className="bg-purple-600 text-white px-3 py-1 rounded inline-block disabled:opacity-60"
+              >
+                {sendingPrecheckoutId === booking.id
+                  ? "Sending..."
+                  : "Send Pre-checkout"}
+              </button>
+
+              {(["active", "reserved"].includes((booking.status || "").toLowerCase())) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/bookings/${booking.id}/swap`);
+                  }}
+                  className="bg-emerald-600 text-white px-3 py-1 rounded inline-block"
+                >
+                  Swap Vehicle
+                </button>
+              )}
+            </div>
         </td>
 
       </tr>
@@ -444,7 +459,7 @@ export default function BookingsPage() {
               )}
             </div>
             </th>
-            <th className="text-left px-2 py-1.5 whitespace-nowrap">Pre-checkout</th>
+              <th className="text-left px-2 py-1.5 whitespace-nowrap">Actions</th>
           </tr>
         </thead>
         <tbody>{renderBookingRows(sortedBookingList, isLoading)}</tbody>
