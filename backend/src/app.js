@@ -32,6 +32,7 @@ app.use("/api/notifications", notificationTemplateRoutes);
 app.use("/api/reports", reportsRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/public", publicRoutes);
+app.use("/public", publicRoutes);
 
 app.use((req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
