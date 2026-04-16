@@ -7,6 +7,7 @@ const {
   getBookingById,
   createBooking,
   updateBooking,
+  swapBookingVehicle,
   rescheduleBooking,
   changeBookingStatus,
   checkinBooking,
@@ -23,6 +24,7 @@ router.get("/:id", protect, getBookingById);
 // create + update
 router.post("/", protect, createBooking);
 router.patch("/:id", protect, updateBooking);
+router.patch("/:id/swap-vehicle", protect, swapBookingVehicle);
 
 // workflow actions
 router.patch("/:id/status", protect, changeBookingStatus);

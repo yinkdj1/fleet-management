@@ -22,6 +22,31 @@ const SERVICE_CHARGE_DAILY = 15;
 const PRECHECKOUT_AUTO_MARKER_TYPE = "precheckout_prompt_auto_sent";
 let twilioClient;
 
+const CHECKOUT_SAFE_INCLUDE = {
+  select: {
+    id: true,
+    bookingId: true,
+    mileageOut: true,
+    fuelLevelOut: true,
+    notesOut: true,
+    checkoutTime: true,
+  },
+};
+
+const CHECKIN_SAFE_INCLUDE = {
+  select: {
+    id: true,
+    bookingId: true,
+    mileageIn: true,
+    fuelLevelIn: true,
+    notesIn: true,
+    damageFee: true,
+    lateFee: true,
+    cleaningFee: true,
+    checkinTime: true,
+  },
+};
+
 function buildAppError(message, statusCode = 400, errors = null) {
   const error = new Error(message);
   error.statusCode = statusCode;
@@ -273,7 +298,16 @@ async function getBookings(filters = {}) {
 
   const where = {};
 
-  if (status) where.status = status;
+  if (status) {
+    const normalizedStatus = String(status).trim().toLowerCase();
+    if (normalizedStatus === "other") {
+      where.status = {
+        in: ["reserved", "cancelled", "no_show"],
+      };
+    } else {
+      where.status = normalizedStatus;
+    }
+  }
   if (customerId) where.customerId = Number(customerId);
   if (vehicleId) where.vehicleId = Number(vehicleId);
 
@@ -321,8 +355,8 @@ async function getBookings(filters = {}) {
       include: {
         customer: true,
         vehicle: true,
-        checkout: true,
-        checkin: true,
+        checkout: CHECKOUT_SAFE_INCLUDE,
+        checkin: CHECKIN_SAFE_INCLUDE,
       },
       orderBy: {
         id: "desc",
@@ -350,8 +384,8 @@ async function getBookingById(id) {
     include: {
       customer: true,
       vehicle: true,
-      checkout: true,
-      checkin: true,
+      checkout: CHECKOUT_SAFE_INCLUDE,
+      checkin: CHECKIN_SAFE_INCLUDE,
       documents: true,
     },
   });
@@ -1001,8 +1035,8 @@ async function getBookingByManageToken(token) {
     include: {
       customer: true,
       vehicle: true,
-      checkout: true,
-      checkin: true,
+      checkout: CHECKOUT_SAFE_INCLUDE,
+      checkin: CHECKIN_SAFE_INCLUDE,
       documents: true,
     },
   });
@@ -1035,11 +1069,13 @@ async function rescheduleBookingByManageToken(token, data = {}) {
     throw buildAppError("Only reserved bookings can be modified", 400);
   }
 
-  // Modify keeps the same reservation; it must not cancel the booking.
-  // rescheduleBooking enforces overlap checks against other reserved/active bookings.
-  const updatedBooking = await rescheduleBooking(booking.id, {
+  const updatedBooking = await updateBooking(booking.id, {
     pickupDatetime: data.pickupDatetime,
     returnDatetime: data.returnDatetime,
+    vehicleId:
+      data.vehicleId !== undefined && data.vehicleId !== null && String(data.vehicleId).trim() !== ""
+        ? Number(data.vehicleId)
+        : booking.vehicleId,
   });
 
   return {
@@ -1060,6 +1096,7 @@ async function cancelBookingByManageToken(token) {
 
   return {
     ...cancelledBooking,
+    cancelledAt: new Date().toISOString(),
     cancellationEmail,
   };
 }
@@ -1518,8 +1555,8 @@ async function getPublicBookingByIdForGuest(id, guest = {}) {
     include: {
       customer: true,
       vehicle: true,
-      checkout: true,
-      checkin: true,
+      checkout: CHECKOUT_SAFE_INCLUDE,
+      checkin: CHECKIN_SAFE_INCLUDE,
       documents: true,
     },
   });
@@ -1623,8 +1660,8 @@ async function extendBookingPublic(id, data = {}, guest = {}) {
     include: {
       customer: true,
       vehicle: true,
-      checkout: true,
-      checkin: true,
+      checkout: CHECKOUT_SAFE_INCLUDE,
+      checkin: CHECKIN_SAFE_INCLUDE,
       documents: true,
     },
   });
@@ -1733,6 +1770,85 @@ async function updateBooking(id, data) {
   };
 }
 
+async function swapBookingVehicle(id, data = {}) {
+  const booking = await getBookingById(id);
+
+  if (!["reserved", "active"].includes(booking.status)) {
+    throw buildAppError("Only reserved or active bookings can swap vehicles", 400);
+  }
+
+  const nextVehicleId = Number(data.vehicleId);
+  if (!Number.isFinite(nextVehicleId) || nextVehicleId <= 0) {
+    throw buildAppError("Vehicle is required", 400, {
+      vehicleId: "Vehicle is required",
+    });
+  }
+
+  if (Number(booking.vehicleId) === nextVehicleId) {
+    throw buildAppError("Please select a different vehicle", 400, {
+      vehicleId: "Selected vehicle is already assigned to this booking",
+    });
+  }
+
+  const vehicle = await ensureVehicleExists(nextVehicleId);
+  validateVehicleBookable(vehicle);
+
+  await checkVehicleAvailability(
+    nextVehicleId,
+    booking.pickupDatetime,
+    booking.returnDatetime,
+    booking.id
+  );
+
+  const pricing = await calculateBookingAmounts({
+    pickupDatetime: booking.pickupDatetime,
+    returnDatetime: booking.returnDatetime,
+    vehicle,
+  });
+
+  const updatedBooking = await prisma.booking.update({
+    where: { id: Number(id) },
+    data: {
+      vehicleId: nextVehicleId,
+      subtotal: pricing.subtotal,
+      tax: pricing.tax,
+      deposit: pricing.deposit,
+      totalAmount: pricing.totalAmount,
+    },
+    include: {
+      customer: true,
+      vehicle: true,
+      checkout: CHECKOUT_SAFE_INCLUDE,
+      checkin: CHECKIN_SAFE_INCLUDE,
+      documents: true,
+    },
+  });
+
+  await reevaluateVehicleStatus(booking.vehicleId);
+  await syncVehicleStatusOnBookingCreate(updatedBooking.vehicleId, updatedBooking.status);
+
+  return {
+    ...updatedBooking,
+    swap: {
+      fromVehicleId: Number(booking.vehicleId),
+      toVehicleId: Number(updatedBooking.vehicleId),
+    },
+    pricing: {
+      days: pricing.days,
+      dailyRate: pricing.dailyRate,
+      rentalSubtotal: pricing.rentalSubtotal,
+      rentalDiscount: pricing.rentalDiscount,
+      discountedRentalSubtotal: pricing.discountedRentalSubtotal,
+      discountPercentage: pricing.discountPercentage,
+      serviceCharge: pricing.serviceCharge,
+      subtotal: pricing.subtotal,
+      tax: pricing.tax,
+      deposit: pricing.deposit,
+      totalAmount: pricing.totalAmount,
+    },
+  };
+}
+
 async function rescheduleBooking(id, data) {
   const booking = await getBookingById(id);
 
@@ -1824,6 +1940,7 @@ async function checkoutBooking(id, data, photos = []) {
       fuelLevelOut: data.fuelLevelOut,
       notesOut: data.notesOut || null,
     },
+    select: CHECKOUT_SAFE_INCLUDE.select,
   });
 
   const photoDocuments = [];
@@ -1848,7 +1965,7 @@ async function checkoutBooking(id, data, photos = []) {
     include: {
       customer: true,
       vehicle: true,
-      checkout: true,
+      checkout: CHECKOUT_SAFE_INCLUDE,
     },
   });
 
@@ -1888,6 +2005,7 @@ async function checkinBooking(id, data, photos = []) {
       lateFee: data.lateFee ? Number(data.lateFee) : 0,
       cleaningFee: data.cleaningFee ? Number(data.cleaningFee) : 0,
     },
+    select: CHECKIN_SAFE_INCLUDE.select,
   });
 
   const photoDocuments = [];
@@ -1912,8 +2030,8 @@ async function checkinBooking(id, data, photos = []) {
     include: {
       customer: true,
       vehicle: true,
-      checkout: true,
-      checkin: true,
+      checkout: CHECKOUT_SAFE_INCLUDE,
+      checkin: CHECKIN_SAFE_INCLUDE,
     },
   });
 
@@ -1944,6 +2062,7 @@ module.exports = {
   findPublicCustomerByContact,
   getPublicBookingByIdForGuest,
   updateBooking,
+  swapBookingVehicle,
   rescheduleBooking,
   changeBookingStatus,
   checkoutBooking,
