@@ -244,8 +244,8 @@ export default function CheckinPage() {
     <AppShell>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Vehicle Return</h1>
-          <p className="mt-1 text-gray-500">Record mileage, fuel, photos, damage, and any fees when the vehicle is returned.</p>
+          <h1 className="text-3xl font-bold">Vehicle Check-In</h1>
+          <p className="mt-1 text-gray-500">Record mileage, fuel, photos, damage, and any fees during vehicle check-in.</p>
         </div>
         <Link href="/bookings" className="rounded bg-zinc-800 px-4 py-2 text-sm text-white">
           ← Back to Bookings
@@ -275,9 +275,9 @@ export default function CheckinPage() {
 
       <form onSubmit={handleSubmit} className="space-y-8 max-w-3xl">
 
-        {/* Section 1 — Return details */}
+        {/* Section 1 — Check-in details */}
         <section className="rounded-xl border bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold">Return Details</h2>
+          <h2 className="mb-4 text-lg font-semibold">Check-In Details</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Mileage In <span className="text-red-500">*</span></label>
@@ -339,8 +339,8 @@ export default function CheckinPage() {
 
         {/* Section 3 — Photos */}
         <section className="rounded-xl border bg-white p-5 shadow-sm">
-          <h2 className="mb-1 text-lg font-semibold">Return Photos</h2>
-          <p className="mb-4 text-sm text-gray-500">Upload photos of all sides of the returned vehicle, including any damage.</p>
+          <h2 className="mb-1 text-lg font-semibold">Check-In Photos</h2>
+          <p className="mb-4 text-sm text-gray-500">Upload check-in photos of all sides of the vehicle, including any damage.</p>
           <label className="flex cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-4 py-5 text-sm text-gray-600 hover:border-green-400 hover:text-green-600">
             <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden="true">
               <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 12V4m0 0-3 3m3-3 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

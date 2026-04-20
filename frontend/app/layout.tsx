@@ -22,6 +22,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.carsgidi.com"),
   title: "Carsgidi",
   description: "Carsgidi car rental platform",
+  icons: {
+    icon: "/favicon.jpeg?v=11",
+    shortcut: "/favicon.ico?v=11",
+    apple: "/favicon.jpeg?v=11",
+  },
   alternates: {
     canonical: "/",
   },

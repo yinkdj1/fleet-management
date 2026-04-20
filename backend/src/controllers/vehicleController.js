@@ -260,8 +260,12 @@ async function checkVehicleAvailability(req, res, next) {
 
 async function getAvailableVehicles(req, res, next) {
   try {
-    const pickupInput = req.query.pickupDatetime || req.query.pickupDate || req.query.startDate;
-    const returnInput = req.query.returnDatetime || req.query.returnDate || req.query.endDate;
+      const pickupInput = req.query.pickupDatetime || req.query.pickupDate || req.query.startDate;
+      const returnInput = req.query.returnDatetime || req.query.returnDate || req.query.endDate;
+      const excludeBookingId =
+        req.query.excludeBookingId !== undefined && req.query.excludeBookingId !== null
+          ? Number(req.query.excludeBookingId)
+          : null;
 
     const parseDateInput = (value, useEndOfDay = false) => {
       if (value === undefined || value === null || String(value).trim() === "") {
@@ -299,15 +303,23 @@ async function getAvailableVehicles(req, res, next) {
       },
     };
 
-    if (pickupDatetime && returnDatetime) {
-      where.bookings = {
-        none: {
+      if (pickupDatetime && returnDatetime) {
+        const overlapFilter = {
           status: { in: ["reserved", "active"] },
           pickupDatetime: { lt: returnDatetime },
           returnDatetime: { gt: pickupDatetime },
-        },
-      };
-    }
+        };
+
+        if (Number.isFinite(excludeBookingId) && excludeBookingId > 0) {
+          overlapFilter.id = { not: excludeBookingId };
+        }
+
+        where.bookings = {
+          none: {
+            ...overlapFilter,
+          },
+        };
+      }
 
     const vehicles = await prisma.vehicle.findMany({
       where,

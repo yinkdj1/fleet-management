@@ -36,6 +36,15 @@ async function updateBooking(req, res, next) {
   }
 }
 
+async function swapBookingVehicle(req, res, next) {
+  try {
+    const booking = await bookingService.swapBookingVehicle(req.params.id, req.body);
+    res.json({ data: booking });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function rescheduleBooking(req, res, next) {
   try {
     const booking = await bookingService.rescheduleBooking(req.params.id, req.body);
@@ -86,6 +95,7 @@ module.exports = {
   getBookingById,
   createBooking,
   updateBooking,
+  swapBookingVehicle,
   rescheduleBooking,
   changeBookingStatus,
   checkoutBooking,

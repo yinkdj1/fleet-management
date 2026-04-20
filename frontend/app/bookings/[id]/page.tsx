@@ -276,12 +276,15 @@ export default function BookingDetailPage() {
     }
   };
 
+  const bookingStatus = (booking?.status || "").toLowerCase();
+  const showCheckActions = bookingStatus === "reserved" || bookingStatus === "active";
+
   return (
     <AppShell>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Booking {formatBookingId(booking?.id)}</h1>
         <div className="space-x-2">
-          {booking && booking.status === "reserved" && (
+          {booking && showCheckActions && (
             <>
               <Link
                 href={`/bookings/${booking.id}/checkout`}
@@ -296,14 +299,6 @@ export default function BookingDetailPage() {
                 Checkin
               </Link>
             </>
-          )}
-          {booking && booking.status === "active" && (
-            <Link
-              href={`/bookings/${booking.id}/checkin`}
-              className="bg-green-600 text-white px-4 py-2 rounded"
-            >
-              Checkin
-            </Link>
           )}
           {booking &&
             !["active", "completed", "cancelled", "no_show"].includes(

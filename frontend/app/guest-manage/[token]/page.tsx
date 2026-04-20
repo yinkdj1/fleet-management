@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import api from "../../../lib/api";
 import { formatBookingId } from "../../../lib/bookingId";
 
@@ -17,9 +17,40 @@ type BookingInfo = {
     email?: string;
   };
   vehicle?: {
+    id?: number;
     make?: string;
     model?: string;
     plateNumber?: string;
+  };
+};
+
+type VehicleOption = {
+  id: number;
+  make?: string;
+  model?: string;
+  plateNumber?: string;
+  dailyRate?: number;
+};
+
+type CancelledSummary = {
+  id: number;
+  status: string;
+  pickupDatetime?: string;
+  returnDatetime?: string;
+  totalAmount?: number;
+  cancelledAt?: string;
+  customer?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  };
+  vehicle?: {
+    make?: string;
+    model?: string;
+    plateNumber?: string;
+  };
+  cancellationEmail?: {
+    message?: string;
   };
 };
 
@@ -35,6 +66,7 @@ function toInputDatetime(value: string) {
 }
 
 export default function GuestManageBookingPage() {
+  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
 
@@ -46,6 +78,14 @@ export default function GuestManageBookingPage() {
   const [booking, setBooking] = useState<BookingInfo | null>(null);
   const [pickupDatetime, setPickupDatetime] = useState("");
   const [returnDatetime, setReturnDatetime] = useState("");
+  const [selectedVehicleId, setSelectedVehicleId] = useState("");
+  const [availableVehicles, setAvailableVehicles] = useState<VehicleOption[]>(
+    [],
+  );
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [cancelledSummary, setCancelledSummary] =
+    useState<CancelledSummary | null>(null);
+  const [redirectSeconds, setRedirectSeconds] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -63,8 +103,11 @@ export default function GuestManageBookingPage() {
       setBooking(data);
       setPickupDatetime(toInputDatetime(data?.pickupDatetime || ""));
       setReturnDatetime(toInputDatetime(data?.returnDatetime || ""));
+      setSelectedVehicleId(String(data?.vehicle?.id || ""));
     } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid or expired booking link.");
+      setError(
+        err.response?.data?.message || "Invalid or expired booking link.",
+      );
     } finally {
       setLoading(false);
     }
@@ -76,12 +119,82 @@ export default function GuestManageBookingPage() {
     }
   }, [token]);
 
+  const loadAvailableVehicles = async (
+    pickupValue: string,
+    returnValue: string,
+    bookingId?: number,
+    fallbackVehicleId?: number,
+  ) => {
+    if (!pickupValue || !returnValue || !bookingId) {
+      setAvailableVehicles([]);
+      return;
+    }
+
+    try {
+      setLoadingVehicles(true);
+      const res = await api.get("/public/vehicles/available", {
+        params: {
+          pickupDatetime: new Date(pickupValue).toISOString(),
+          returnDatetime: new Date(returnValue).toISOString(),
+          excludeBookingId: bookingId,
+        },
+      });
+
+      const vehicles: VehicleOption[] = res.data?.data || [];
+      setAvailableVehicles(vehicles);
+
+      if (vehicles.length === 0) {
+        if (fallbackVehicleId) {
+          setSelectedVehicleId(String(fallbackVehicleId));
+        }
+        return;
+      }
+
+      const selectedStillAvailable = vehicles.some(
+        (vehicle) => String(vehicle.id) === String(selectedVehicleId),
+      );
+
+      if (!selectedStillAvailable) {
+        const fallbackStillAvailable = fallbackVehicleId
+          ? vehicles.some(
+              (vehicle) => String(vehicle.id) === String(fallbackVehicleId),
+            )
+          : false;
+
+        if (fallbackStillAvailable && fallbackVehicleId) {
+          setSelectedVehicleId(String(fallbackVehicleId));
+        } else {
+          setSelectedVehicleId(String(vehicles[0].id));
+        }
+      }
+    } catch {
+      setAvailableVehicles([]);
+    } finally {
+      setLoadingVehicles(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!booking || !canEdit) {
+      return;
+    }
+
+    loadAvailableVehicles(
+      pickupDatetime,
+      returnDatetime,
+      booking.id,
+      booking.vehicle?.id,
+    );
+  }, [booking?.id, pickupDatetime, returnDatetime, canEdit]);
+
   useEffect(() => {
     if (isCancelFlow) {
       setMessage("This link opened the cancel flow. Review and confirm below.");
     }
     if (isModifyFlow) {
-      setMessage("This link opened the modify flow. Update dates and save your reservation.");
+      setMessage(
+        "This link opened the modify flow. Update dates and save your reservation.",
+      );
     }
   }, [isCancelFlow, isModifyFlow]);
 
@@ -100,14 +213,20 @@ export default function GuestManageBookingPage() {
       return;
     }
 
+    if (!selectedVehicleId) {
+      setError("Please select an available vehicle.");
+      return;
+    }
+
     try {
       setSaving(true);
       await api.patch(`/public/manage/${token}/modify`, {
         pickupDatetime: new Date(pickupDatetime).toISOString(),
         returnDatetime: new Date(returnDatetime).toISOString(),
+        vehicleId: Number(selectedVehicleId),
       });
       setMessage(
-        "Booking updated successfully. Your reservation remains active with the new dates."
+        "Booking updated successfully. Your reservation remains active with the new dates.",
       );
       await loadBooking();
     } catch (err: any) {
@@ -124,13 +243,16 @@ export default function GuestManageBookingPage() {
     try {
       setCancelling(true);
       const res = await api.post(`/public/manage/${token}/cancel`);
-      const emailMessage = res.data?.data?.cancellationEmail?.message;
+      const payload = (res.data?.data || null) as CancelledSummary | null;
+      const emailMessage = payload?.cancellationEmail?.message;
+      setCancelledSummary(payload);
       setMessage(
         emailMessage
           ? `Booking cancelled successfully. ${emailMessage}`
-          : "Booking cancelled successfully."
+          : "Booking cancelled successfully.",
       );
-      await loadBooking();
+      setBooking(null);
+      setRedirectSeconds(8);
     } catch (err: any) {
       setError(err.response?.data?.message || "Unable to cancel booking.");
     } finally {
@@ -138,13 +260,34 @@ export default function GuestManageBookingPage() {
     }
   };
 
+  useEffect(() => {
+    if (redirectSeconds === null) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (redirectSeconds <= 1) {
+        setRedirectSeconds(null);
+        router.push("/reserve");
+        return;
+      }
+
+      setRedirectSeconds((prev) => (prev === null ? null : prev - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [redirectSeconds, router]);
+
   return (
     <main className="min-h-screen bg-zinc-100 px-3 py-6 sm:px-6">
       <div className="mx-auto w-full max-w-2xl space-y-4">
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h1 className="text-2xl font-bold text-zinc-900">Manage Your Booking</h1>
+          <h1 className="text-2xl font-bold text-zinc-900">
+            Manage Your Booking
+          </h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Use this secure link to modify your reservation dates or cancel your booking.
+            Use this secure link to modify your reservation dates or cancel your
+            booking.
           </p>
         </section>
 
@@ -162,23 +305,87 @@ export default function GuestManageBookingPage() {
           </p>
         )}
 
+        {cancelledSummary && (
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm space-y-2">
+            <h2 className="text-lg font-semibold text-emerald-900">
+              Reservation Cancelled
+            </h2>
+            <p className="text-sm text-emerald-800">
+              Trip {formatBookingId(cancelledSummary.id)} has been cancelled and
+              removed from active bookings.
+            </p>
+            <p className="text-sm text-emerald-800">
+              Vehicle: {cancelledSummary.vehicle?.make}{" "}
+              {cancelledSummary.vehicle?.model} (
+              {cancelledSummary.vehicle?.plateNumber})
+            </p>
+            <p className="text-sm text-emerald-800">
+              Pickup:{" "}
+              {cancelledSummary.pickupDatetime
+                ? new Date(cancelledSummary.pickupDatetime).toLocaleString()
+                : "-"}
+            </p>
+            <p className="text-sm text-emerald-800">
+              Return:{" "}
+              {cancelledSummary.returnDatetime
+                ? new Date(cancelledSummary.returnDatetime).toLocaleString()
+                : "-"}
+            </p>
+            <p className="text-sm text-emerald-800">
+              Cancelled at:{" "}
+              {cancelledSummary.cancelledAt
+                ? new Date(cancelledSummary.cancelledAt).toLocaleString()
+                : "-"}
+            </p>
+            {redirectSeconds !== null && (
+              <p className="text-sm font-medium text-emerald-900">
+                Redirecting to new reservation in {redirectSeconds}s...
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setRedirectSeconds(null);
+                router.push("/reserve");
+              }}
+              className="mt-2 w-full rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800"
+            >
+              Book Another Trip
+            </button>
+          </section>
+        )}
+
         {booking && (
           <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-2">
-            <p className="text-sm text-zinc-700">Booking {formatBookingId(booking.id)}</p>
-            <p className="text-sm text-zinc-700">Status: <span className="font-semibold">{booking.status}</span></p>
             <p className="text-sm text-zinc-700">
-              Vehicle: {booking.vehicle?.make} {booking.vehicle?.model} ({booking.vehicle?.plateNumber})
+              Booking {formatBookingId(booking.id)}
             </p>
-            <p className="text-sm text-zinc-700">Total: ${Number(booking.totalAmount || 0).toFixed(2)}</p>
+            <p className="text-sm text-zinc-700">
+              Status: <span className="font-semibold">{booking.status}</span>
+            </p>
+            <p className="text-sm text-zinc-700">
+              Vehicle: {booking.vehicle?.make} {booking.vehicle?.model} (
+              {booking.vehicle?.plateNumber})
+            </p>
+            <p className="text-sm text-zinc-700">
+              Total: ${Number(booking.totalAmount || 0).toFixed(2)}
+            </p>
           </section>
         )}
 
         {booking && canEdit && !isCancelFlow && (
-          <form onSubmit={handleModify} className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold text-zinc-900">Modify Reservation</h2>
+          <form
+            onSubmit={handleModify}
+            className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-4"
+          >
+            <h2 className="text-lg font-semibold text-zinc-900">
+              Modify Reservation
+            </h2>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700">Pickup</label>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">
+                Pickup
+              </label>
               <input
                 type="datetime-local"
                 value={pickupDatetime}
@@ -189,7 +396,9 @@ export default function GuestManageBookingPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700">Return</label>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">
+                Return
+              </label>
               <input
                 type="datetime-local"
                 value={returnDatetime}
@@ -197,6 +406,37 @@ export default function GuestManageBookingPage() {
                 className="w-full rounded-xl border border-zinc-300 bg-white p-3"
                 required
               />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700">
+                Vehicle
+              </label>
+              <select
+                value={selectedVehicleId}
+                onChange={(e) => setSelectedVehicleId(e.target.value)}
+                className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                required
+              >
+                {loadingVehicles ? (
+                  <option value="">Loading available vehicles...</option>
+                ) : availableVehicles.length === 0 ? (
+                  <option value="">
+                    No available vehicles for selected dates
+                  </option>
+                ) : (
+                  availableVehicles.map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.make} {vehicle.model} ({vehicle.plateNumber}) - $
+                      {Number(vehicle.dailyRate || 0).toFixed(2)}/day
+                    </option>
+                  ))
+                )}
+              </select>
+              <p className="mt-1 text-xs text-zinc-500">
+                Choose any available vehicle for the selected pickup and return
+                window.
+              </p>
             </div>
 
             <button
@@ -211,9 +451,12 @@ export default function GuestManageBookingPage() {
 
         {booking && canEdit && !isModifyFlow && (
           <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-3">
-            <h2 className="text-lg font-semibold text-zinc-900">Cancel Reservation</h2>
+            <h2 className="text-lg font-semibold text-zinc-900">
+              Cancel Reservation
+            </h2>
             <p className="text-sm text-zinc-600">
-              Need to cancel? This action will mark your booking as cancelled immediately.
+              Need to cancel? This action will cancel and remove your booking
+              immediately.
             </p>
             <button
               type="button"
@@ -229,7 +472,8 @@ export default function GuestManageBookingPage() {
         {booking && !canEdit && (
           <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-zinc-700">
-              This booking can no longer be modified or cancelled from this link.
+              This booking can no longer be modified or cancelled from this
+              link.
             </p>
           </section>
         )}

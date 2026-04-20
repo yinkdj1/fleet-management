@@ -113,6 +113,13 @@ body {
   font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
 }
 
+button,
+a,
+input[type="button"],
+input[type="submit"] {
+  touch-action: manipulation;
+}
+
 .fade-up {
   animation: fadeUp 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
