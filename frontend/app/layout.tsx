@@ -19,6 +19,10 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  icons: {
+    icon: "/Favi.png",
+    apple: "/Favi.png",
+  },
 };
 
 export default function RootLayout({
