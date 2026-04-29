@@ -1,5 +1,3 @@
-import dynamic from "next/dynamic";
-const ChatWidget = dynamic(() => import("../../components/ChatWidget"), { ssr: false });
 "use client";
 import dynamic from "next/dynamic";
 import { Inter } from "next/font/google";
