@@ -1597,31 +1597,31 @@ export default function ReservePage() {
                   />
                 </div>
                 <div className="relative h-full flex flex-col justify-end">
-                  <div className="absolute bottom-0 left-0 right-0 w-full bg-white/90 backdrop-blur-sm p-2 rounded-b-3xl md:left-1/2 md:right-auto md:bottom-4 md:-translate-x-1/2 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:gap-1 md:rounded-2xl md:border md:border-white/80 md:bg-white/95 md:p-2 md:shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] md:backdrop-blur md:items-end md:reserve-card-reveal md:reserve-card-reveal-late md:reserve-surface-lift lg:bottom-6 lg:w-[calc(100%-3rem)]">
-                    <div className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 mb-2 md:mb-0">
-                      <p className={`${displayFont.className} text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700 md:text-xs`}>
+                  <div className="absolute bottom-0 left-0 right-0 w-full bg-white/90 backdrop-blur-sm p-2 rounded-b-3xl grid grid-cols-2 gap-1 md:left-1/2 md:right-auto md:bottom-4 md:-translate-x-1/2 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:gap-1 md:rounded-2xl md:border md:border-white/80 md:bg-white/95 md:p-2 md:shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] md:backdrop-blur md:items-end md:reserve-card-reveal md:reserve-card-reveal-late md:reserve-surface-lift lg:bottom-6 lg:w-[calc(100%-3rem)]">
+                    <div className="col-span-2 md:col-span-1 rounded-xl border border-slate-200 bg-white px-2 py-1 md:py-1.5 md:mb-0">
+                      <p className={`${displayFont.className} text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-700 md:text-xs`}>
                         Pickup location
                       </p>
-                      <p className={`${displayFont.className} mt-0.5 text-sm font-semibold text-zinc-900 md:text-sm`}>
+                      <p className={`${displayFont.className} mt-0.5 text-xs font-semibold text-zinc-900 md:text-sm truncate`}>
                         {pickupLocation}
                       </p>
                     </div>
-                    <div className="mb-2 md:mb-0">
-                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-700 md:text-sm`}>Pickup date</label>
+                    <div className="md:mb-0">
+                      <label className={`${displayFont.className} mb-0.5 block text-[10px] font-semibold text-zinc-700 md:text-sm`}>Pickup date</label>
                       <input
                         type="datetime-local"
                         name="pickupDatetime"
                         value={form.pickupDatetime}
                         onChange={handleChange}
-                        className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1.5 text-xs text-zinc-900 shadow-sm md:p-2 md:text-sm"
+                        className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1 text-[10px] text-zinc-900 shadow-sm md:p-2 md:text-sm"
                         required
                       />
                       {fieldErrors.pickupDatetime && (
                         <p className="mt-1 text-sm text-red-600">{fieldErrors.pickupDatetime}</p>
                       )}
                     </div>
-                    <div className="mb-2 md:mb-0">
-                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-700 md:text-sm`}>Return date</label>
+                    <div className="md:mb-0">
+                      <label className={`${displayFont.className} mb-0.5 block text-[10px] font-semibold text-zinc-700 md:text-sm`}>Return date</label>
                       <input
                         type="datetime-local"
                         name="returnDatetime"
@@ -1632,14 +1632,14 @@ export default function ReservePage() {
                             ? getMinimumReturnDatetime(form.pickupDatetime)
                             : undefined
                         }
-                        className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1.5 text-xs text-zinc-900 shadow-sm md:p-2 md:text-sm"
+                        className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1 text-[10px] text-zinc-900 shadow-sm md:p-2 md:text-sm"
                         required
                       />
                       {fieldErrors.returnDatetime && (
                         <p className="mt-1 text-sm text-red-600">{fieldErrors.returnDatetime}</p>
                       )}
                     </div>
-                    <div>
+                    <div className="col-span-2 md:col-span-1">
                       <button
                         type="button"
                         onClick={handleSearchCars}
