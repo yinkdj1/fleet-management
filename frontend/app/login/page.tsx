@@ -1,5 +1,5 @@
 "use client";
-
+"use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ChangeEvent, FormEvent } from "react";
@@ -84,7 +84,7 @@ export default function LoginPage() {
             placeholder="Password"
           />
 
-          <button className="attention-bounce mt-7 w-full rounded-xl bg-[var(--color-accent)] py-2.5 font-semibold text-[var(--color-ink)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-14px_rgba(245,191,98,0.8)]">
+          <button type="submit" className="attention-bounce mt-7 w-full rounded-xl bg-[var(--color-accent)] py-2.5 font-semibold text-[var(--color-ink)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-14px_rgba(245,191,98,0.8)]">
             Login
           </button>
         </form>
