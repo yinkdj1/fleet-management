@@ -430,7 +430,7 @@ async function uploadVehicleImage(req, res, next) {
       throw error;
     }
 
-    const imageUrl = `/uploads/${req.file.filename}`;
+    const imageUrl = req.file.path;
     await updateVehicleProfile(vehicleId, { imageUrl });
 
     res.json({ data: { imageUrl } });

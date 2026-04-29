@@ -1,21 +1,19 @@
-const fs = require("fs");
-const path = require("path");
 const multer = require("multer");
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
-const uploadDir = path.join(process.cwd(), "uploads");
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const timestamp = Date.now();
-    const sanitized = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "-");
-    cb(null, `${timestamp}-${sanitized}`);
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "carsgidi",
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    transformation: [{ quality: "auto", fetch_format: "auto" }],
   },
 });
 
