@@ -2727,6 +2727,23 @@ export default function ReservePage() {
             className="rounded-2xl border border-slate-700/60 bg-slate-900 px-4 py-4 shadow-[0_14px_26px_-18px_rgba(15,23,42,0.45)] transition hover:-translate-y-0.5"
           >
             <div className="flex items-center gap-3">
+              <div className="inline-flex rounded-full bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 p-3 text-white shadow-lg shadow-orange-500/30 ring-1 ring-white/30">
+                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+                  <path d="M12 3 5 6.5V11c0 4.4 2.8 7.4 7 8.8 4.2-1.4 7-4.4 7-8.8V6.5L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                  <path d="M9.5 12.5 11.5 14.5 15 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M12 6.8v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" opacity="0.85" />
+                </svg>
+              </div>
+              <p className="pt-1 text-sm font-semibold text-slate-100">
+                Protection Plan Included
+              </p>
+            </div>
+          </article>
+
+          <article
+            className="rounded-2xl border border-slate-700/60 bg-slate-900 px-4 py-4 shadow-[0_14px_26px_-18px_rgba(15,23,42,0.45)] transition hover:-translate-y-0.5"
+          >
+            <div className="flex items-center gap-3">
               <div className="inline-flex rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-500 p-3 text-white shadow-lg shadow-emerald-500/30 ring-1 ring-white/30">
                 <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
                   <path d="M4 12a8 8 0 1 1 16 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -2754,23 +2771,6 @@ export default function ReservePage() {
                   +1 (470) 238-2358
                 </a>
               </div>
-            </div>
-          </article>
-
-          <article
-            className="rounded-2xl border border-slate-700/60 bg-slate-900 px-4 py-4 shadow-[0_14px_26px_-18px_rgba(15,23,42,0.45)] transition hover:-translate-y-0.5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="inline-flex rounded-full bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 p-3 text-white shadow-lg shadow-orange-500/30 ring-1 ring-white/30">
-                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-                  <path d="M12 3 5 6.5V11c0 4.4 2.8 7.4 7 8.8 4.2-1.4 7-4.4 7-8.8V6.5L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-                  <path d="M9.5 12.5 11.5 14.5 15 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M12 6.8v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" opacity="0.85" />
-                </svg>
-              </div>
-              <p className="pt-1 text-sm font-semibold text-slate-100">
-                Protection Plan Included
-              </p>
             </div>
           </article>
       </section>
