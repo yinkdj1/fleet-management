@@ -8,7 +8,7 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<{ id: number; text: string; sender: string; timestamp: Date; isError?: boolean }[]>([
     {
       id: 1,
-      text: "Hi! I'm Carsgidi's assistant. How can I help you today?",
+      text: "Hi! I'm Ashake, Carsgidi's assistant. How can I help you today?",
       sender: "bot",
       timestamp: new Date(),
     },
