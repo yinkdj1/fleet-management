@@ -1597,7 +1597,7 @@ export default function ReservePage() {
                   />
                 </div>
                 <div className="relative h-full flex flex-col justify-end">
-                  <div className="w-full md:absolute md:left-1/2 md:bottom-2 md:-translate-x-1/2 md:w-[calc(100%-1rem)] md:grid md:gap-1 md:rounded-2xl md:border md:border-white/80 md:bg-white/95 md:p-1 md:shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] md:backdrop-blur md:reserve-card-reveal md:reserve-card-reveal-late md:reserve-surface-lift md:bottom-4 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:items-end md:p-2 lg:bottom-6 lg:w-[calc(100%-3rem)]">
+                  <div className="absolute bottom-0 left-0 right-0 w-full bg-white/90 backdrop-blur-sm p-2 rounded-b-3xl md:left-1/2 md:right-auto md:bottom-4 md:-translate-x-1/2 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:gap-1 md:rounded-2xl md:border md:border-white/80 md:bg-white/95 md:p-2 md:shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] md:backdrop-blur md:items-end md:reserve-card-reveal md:reserve-card-reveal-late md:reserve-surface-lift lg:bottom-6 lg:w-[calc(100%-3rem)]">
                     <div className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 mb-2 md:mb-0">
                       <p className={`${displayFont.className} text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700 md:text-xs`}>
                         Pickup location
