@@ -1,18 +1,18 @@
 "use client";
 import dynamic from "next/dynamic";
-const ChatWidget = dynamic(() => import("../../components/ChatWidget"), { ssr: false });
+import { Inter } from "next/font/google";
+import { useEffect, useMemo, useRef, useState } from "react";
+import api from "../../lib/api";
+
+const ChatWidget = dynamic(() => import("../components/ChatWidget"), { ssr: false });
+
 // Default discount tiers (empty by default)
 const DEFAULT_BOOKING_DISCOUNT_TIERS: { minDays: number; discountPercent: number }[] = [];
 
 // Default values for reservation calculations
-const TAX_PERCENTAGE = 7.5; // Example: 7.5% sales tax
-const SERVICE_CHARGE_PER_DAY = 10; // Example: $10 per day service fee
-const PROTECTION_PLAN_FEE_PER_DAY = 15; // Example: $15 per day protection plan
-
-
-import { Inter } from "next/font/google";
-import { useEffect, useMemo, useRef, useState } from "react";
-import api from "../../lib/api";
+const TAX_PERCENTAGE = 7.5;
+const SERVICE_CHARGE_PER_DAY = 10;
+const PROTECTION_PLAN_FEE_PER_DAY = 15;
 // Font setup
 const bodyFont = Inter({ subsets: ["latin"], weight: ["400", "700"] });
 const displayFont = { className: "font-satoshi" };
