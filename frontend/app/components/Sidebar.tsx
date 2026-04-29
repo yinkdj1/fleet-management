@@ -14,6 +14,7 @@ const links = [
   { href: "/notifications", label: "Notifications" },
   { href: "/reports", label: "Reports" },
   { href: "/coupon", label: "Coupons" },
+  { href: "/admin/users", label: "Staff Accounts" },
 ];
 
 export default function Sidebar() {
