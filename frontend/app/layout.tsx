@@ -19,10 +19,12 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
-  icons: {
-    icon: "/Favi.png",
-    apple: "/Favi.png",
-  },
+  icons: [
+    { rel: "icon", url: "/Favi.png", type: "image/png" },
+    { rel: "icon", url: "/favicon.ico", type: "image/x-icon" },
+    { rel: "apple-touch-icon", url: "/Favi.png" },
+    { rel: "shortcut icon", url: "/favicon.ico" },
+  ],
 };
 
 export default function RootLayout({
