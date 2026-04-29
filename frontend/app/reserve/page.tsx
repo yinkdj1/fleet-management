@@ -1,3 +1,5 @@
+import dynamic from "next/dynamic";
+const ChatWidget = dynamic(() => import("../../components/ChatWidget"), { ssr: false });
 "use client";
 // Default discount tiers (empty by default)
 const DEFAULT_BOOKING_DISCOUNT_TIERS: { minDays: number; discountPercent: number }[] = [];
@@ -1538,7 +1540,8 @@ export default function ReservePage() {
   };
 
     return (
-      <main className={`${bodyFont.className} relative isolate min-h-screen bg-white px-3 pb-2 pt-2 sm:px-4 sm:pb-3 sm:pt-3 transition-colors duration-500 ${isNightTheme ? "text-slate-100" : "text-slate-900"}`}>
+      <main className={`${bodyFont.className} relative isolate min-h-screen bg-white px-3 pb-2 pt-2 sm:px-4 sm:pb-3 sm:pt-3 transition-colors duration-500 ${isNightTheme ? "text-slate-100" : "text-slate-900"}`}> 
+        <ChatWidget />
 
         {/* Theme toggle */}
         <div className="absolute top-4 right-4 z-50 flex items-center gap-1 rounded-full border border-white/20 bg-black/20 p-1 backdrop-blur">
