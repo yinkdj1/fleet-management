@@ -1,8 +1,8 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[var(--color-ink)] text-[var(--color-paper)]">
+  redirect("/reserve");
+}
       <div className="pointer-events-none absolute -left-28 top-16 h-72 w-72 rounded-full bg-[var(--color-accent)]/25 blur-3xl orb-float" />
       <div className="pointer-events-none absolute -right-16 top-40 h-80 w-80 rounded-full bg-[var(--color-cyan)]/30 blur-3xl orb-float-delayed" />
 
