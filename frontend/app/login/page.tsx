@@ -31,6 +31,8 @@ export default function LoginPage() {
       const payload = res.data?.data || res.data;
       localStorage.setItem("token", payload.token);
       localStorage.setItem("user", JSON.stringify(payload.user));
+      // Set a cookie so Next.js middleware can protect routes server-side
+      document.cookie = `token=${payload.token}; path=/; SameSite=Lax; max-age=604800`;
       router.push("/dashboard");
     } catch (err: unknown) {
       const errorMessage =

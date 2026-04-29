@@ -23,6 +23,7 @@ export default function Sidebar() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    document.cookie = "token=; path=/; max-age=0";
     router.push("/login");
   };
 
