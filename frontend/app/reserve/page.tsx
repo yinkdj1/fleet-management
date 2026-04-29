@@ -1,6 +1,6 @@
+"use client";
 import dynamic from "next/dynamic";
 const ChatWidget = dynamic(() => import("../../components/ChatWidget"), { ssr: false });
-"use client";
 // Default discount tiers (empty by default)
 const DEFAULT_BOOKING_DISCOUNT_TIERS: { minDays: number; discountPercent: number }[] = [];
 
