@@ -18,6 +18,17 @@ model User {
   updatedAt    DateTime @updatedAt
 }
 
+model PricingSettings {
+  id                    Int      @id
+  threeDayPercentage    Float    @default(5)
+  sevenDayPercentage    Float    @default(10)
+  fourteenDayPercentage Float    @default(15)
+  depositAmount         Float    @default(100)
+  pickupLocation        String   @default("Main Office")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
 model Vehicle {
   id                 Int                 @id @default(autoincrement())
   vin                String              @unique
@@ -73,6 +84,8 @@ model Booking {
   documents          Document[]
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+  couponId           Int?
+  coupon             Coupon?   @relation(fields: [couponId], references: [id])
 }
 
 model MaintenanceRecord {
@@ -113,6 +126,7 @@ model Checkin {
   booking      Booking  @relation(fields: [bookingId], references: [id])
 }
 
+
 model Document {
   id           Int      @id @default(autoincrement())
   bookingId    Int?
@@ -124,3 +138,21 @@ model Document {
 
   booking      Booking? @relation(fields: [bookingId], references: [id])
 }
+
+model Coupon {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  type         String   // 'percent' or 'fixed'
+  value        Float
+  maxRedemptions Int?   // null = unlimited
+  expiresAt    DateTime?
+  createdById  Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  bookings     Booking[]
+}
+
+// Optionally, add couponId to Booking for direct association
+// Add this to Booking model:
+// couponId      Int?
+// coupon        Coupon? @relation(fields: [couponId], references: [id])

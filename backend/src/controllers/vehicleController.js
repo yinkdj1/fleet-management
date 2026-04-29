@@ -1,5 +1,22 @@
 const prisma = require("../config/db");
 const bookingService = require("../services/bookingService");
+const {
+  sanitizeUsageType,
+  sanitizeVehicleCategory,
+  ensureVehicleUsageSetting,
+  sanitizeVehicleDescription,
+  sanitizeVehicleText,
+  sanitizePassengers,
+  sanitizeDailyMileage,
+  getVehicleProfileById,
+  updateVehicleProfile,
+  attachVehicleProfile,
+} = require("../services/vehicleUsageService");
+const {
+  getVehicleCategoryPricing,
+  updateVehicleCategoryPricing,
+  getRateForCategory,
+} = require("../services/vehicleCategoryPricingService");
 
 async function getVehicles(req, res, next) {
   try {
@@ -38,8 +55,10 @@ async function getVehicles(req, res, next) {
       prisma.vehicle.count({ where }),
     ]);
 
+    const dataWithUsage = await attachVehicleProfile(data);
+
     res.json({
-      data,
+      data: dataWithUsage,
       pagination: {
         total,
         page: pageNumber,
@@ -65,7 +84,10 @@ async function getVehicleById(req, res, next) {
       throw error;
     }
 
-    res.json({ data: vehicle });
+    await ensureVehicleUsageSetting(vehicle.id);
+    const vehicleWithUsage = (await attachVehicleProfile([vehicle]))[0];
+
+    res.json({ data: vehicleWithUsage });
   } catch (error) {
     next(error);
   }
@@ -73,13 +95,36 @@ async function getVehicleById(req, res, next) {
 
 async function createVehicle(req, res, next) {
   try {
-    const { vin, plateNumber, make, model, year, color, mileage, dailyRate, status } = req.body;
+    const {
+      vin,
+      plateNumber,
+      make,
+      model,
+      year,
+      color,
+      mileage,
+      status,
+      category,
+      usageType,
+      description,
+      fuelType,
+      transmission,
+      passengers,
+      dailyMileage,
+    } = req.body;
 
-    if (!vin || !plateNumber || !make || !model || !year || !dailyRate) {
-      const error = new Error("vin, plateNumber, make, model, year, and dailyRate are required");
+    if (!vin || !plateNumber || !make || !model || !year) {
+      const error = new Error("vin, plateNumber, make, model, and year are required");
       error.statusCode = 400;
       throw error;
     }
+
+    const categoryPricing = await getVehicleCategoryPricing();
+    const normalizedCategory = sanitizeVehicleCategory(category, "compact");
+    const effectiveDailyRate =
+      normalizedCategory === "unassigned"
+        ? getRateForCategory(categoryPricing.rates, "compact")
+        : getRateForCategory(categoryPricing.rates, normalizedCategory);
 
     const vehicle = await prisma.vehicle.create({
       data: {
@@ -90,12 +135,23 @@ async function createVehicle(req, res, next) {
         year: Number(year),
         color: color || null,
         mileage: mileage !== undefined ? Number(mileage) : 0,
-        dailyRate: Number(dailyRate),
+        dailyRate: effectiveDailyRate,
         status: status || "available",
       },
     });
 
-    res.status(201).json({ data: vehicle });
+    await updateVehicleProfile(vehicle.id, {
+      category: normalizedCategory,
+      usageType: sanitizeUsageType(usageType, "both"),
+      description: sanitizeVehicleDescription(description, ""),
+      fuelType: sanitizeVehicleText(fuelType, ""),
+      transmission: sanitizeVehicleText(transmission, ""),
+      passengers: sanitizePassengers(passengers, 0),
+      dailyMileage: sanitizeDailyMileage(dailyMileage, 0),
+    });
+    const vehicleWithUsage = (await attachVehicleProfile([vehicle]))[0];
+
+    res.status(201).json({ data: vehicleWithUsage });
   } catch (error) {
     if (error.code === "P2002") {
       error.statusCode = 400;
@@ -107,7 +163,45 @@ async function createVehicle(req, res, next) {
 
 async function updateVehicle(req, res, next) {
   try {
-    const { vin, plateNumber, make, model, year, color, mileage, dailyRate, status } = req.body;
+    const {
+      vin,
+      plateNumber,
+      make,
+      model,
+      year,
+      color,
+      mileage,
+      status,
+      category,
+      usageType,
+      description,
+      fuelType,
+      transmission,
+      passengers,
+      dailyMileage,
+    } = req.body;
+
+    const currentVehicle = await prisma.vehicle.findUnique({
+      where: { id: Number(req.params.id) },
+      select: { dailyRate: true },
+    });
+
+    if (!currentVehicle) {
+      const error = new Error("Vehicle not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const currentProfile = await getVehicleProfileById(Number(req.params.id));
+    const nextCategory =
+      category !== undefined
+        ? sanitizeVehicleCategory(category, currentProfile.category)
+        : currentProfile.category;
+    const categoryPricing = await getVehicleCategoryPricing();
+    const effectiveDailyRate =
+      nextCategory === "unassigned"
+        ? Number(currentVehicle.dailyRate || 0)
+        : getRateForCategory(categoryPricing.rates, nextCategory);
 
     const vehicle = await prisma.vehicle.update({
       where: { id: Number(req.params.id) },
@@ -119,12 +213,57 @@ async function updateVehicle(req, res, next) {
         year: year !== undefined ? Number(year) : undefined,
         color: color !== undefined ? color : undefined,
         mileage: mileage !== undefined ? Number(mileage) : undefined,
-        dailyRate: dailyRate !== undefined ? Number(dailyRate) : undefined,
+        dailyRate: effectiveDailyRate,
         status: status !== undefined ? status : undefined,
       },
     });
 
-    res.json({ data: vehicle });
+    if (
+      category !== undefined ||
+      usageType !== undefined ||
+      description !== undefined ||
+      fuelType !== undefined ||
+      transmission !== undefined ||
+      passengers !== undefined ||
+      dailyMileage !== undefined
+    ) {
+      await updateVehicleProfile(vehicle.id, {
+        category:
+          category !== undefined
+            ? sanitizeVehicleCategory(category, "compact")
+            : undefined,
+        usageType:
+          usageType !== undefined
+            ? sanitizeUsageType(usageType, "both")
+            : undefined,
+        description:
+          description !== undefined
+            ? sanitizeVehicleDescription(description, "")
+            : undefined,
+        fuelType:
+          fuelType !== undefined
+            ? sanitizeVehicleText(fuelType, "")
+            : undefined,
+        transmission:
+          transmission !== undefined
+            ? sanitizeVehicleText(transmission, "")
+            : undefined,
+        passengers:
+          passengers !== undefined
+            ? sanitizePassengers(passengers, 0)
+            : undefined,
+        dailyMileage:
+          dailyMileage !== undefined
+            ? sanitizeDailyMileage(dailyMileage, 0)
+            : undefined,
+      });
+    } else {
+      await ensureVehicleUsageSetting(vehicle.id);
+    }
+
+    const vehicleWithUsage = (await attachVehicleProfile([vehicle]))[0];
+
+    res.json({ data: vehicleWithUsage });
   } catch (error) {
     if (error.code === "P2002") {
       error.statusCode = 400;
@@ -163,8 +302,12 @@ async function checkVehicleAvailability(req, res, next) {
 
 async function getAvailableVehicles(req, res, next) {
   try {
-    const pickupInput = req.query.pickupDatetime || req.query.pickupDate || req.query.startDate;
-    const returnInput = req.query.returnDatetime || req.query.returnDate || req.query.endDate;
+      const pickupInput = req.query.pickupDatetime || req.query.pickupDate || req.query.startDate;
+      const returnInput = req.query.returnDatetime || req.query.returnDate || req.query.endDate;
+      const excludeBookingId =
+        req.query.excludeBookingId !== undefined && req.query.excludeBookingId !== null
+          ? Number(req.query.excludeBookingId)
+          : null;
 
     const parseDateInput = (value, useEndOfDay = false) => {
       if (value === undefined || value === null || String(value).trim() === "") {
@@ -202,28 +345,95 @@ async function getAvailableVehicles(req, res, next) {
       },
     };
 
-    if (pickupDatetime && returnDatetime) {
-      where.bookings = {
-        none: {
+      if (pickupDatetime && returnDatetime) {
+        const overlapFilter = {
           status: { in: ["reserved", "active"] },
           pickupDatetime: { lt: returnDatetime },
           returnDatetime: { gt: pickupDatetime },
-        },
-      };
-    }
+        };
+
+        if (Number.isFinite(excludeBookingId) && excludeBookingId > 0) {
+          overlapFilter.id = { not: excludeBookingId };
+        }
+
+        where.bookings = {
+          none: {
+            ...overlapFilter,
+          },
+        };
+      }
 
     const vehicles = await prisma.vehicle.findMany({
       where,
       orderBy: { createdAt: "desc" },
     });
 
-    const availableVehicles = vehicles.map((vehicle) => ({
+    const vehiclesWithUsage = await attachVehicleProfile(vehicles);
+
+    const availableVehicles = vehiclesWithUsage.map((vehicle) => ({
       ...vehicle,
       currentStatus: vehicle.status,
       status: "available",
     }));
 
     res.json({ data: availableVehicles });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getVehicleCategoryPricingOptions(req, res, next) {
+  try {
+    const settings = await getVehicleCategoryPricing();
+    res.json({ data: settings });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function updateVehicleCategoryPricingOptions(req, res, next) {
+  try {
+    const settings = await updateVehicleCategoryPricing(req.body || {});
+    res.json({ data: settings, message: "Vehicle category pricing updated" });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function uploadVehicleImage(req, res, next) {
+  try {
+    const vehicleId = Number(req.params.id);
+
+    if (!Number.isFinite(vehicleId) || vehicleId <= 0) {
+      const error = new Error("Invalid vehicle ID");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+    if (!vehicle) {
+      const error = new Error("Vehicle not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (!req.file) {
+      const error = new Error("No image file provided");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!ALLOWED_TYPES.includes(req.file.mimetype)) {
+      const error = new Error("Invalid file type. Only JPEG, PNG, and WebP are allowed.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const imageUrl = `/uploads/${req.file.filename}`;
+    await updateVehicleProfile(vehicleId, { imageUrl });
+
+    res.json({ data: { imageUrl } });
   } catch (error) {
     next(error);
   }
@@ -237,4 +447,7 @@ module.exports = {
   deleteVehicle,
   checkVehicleAvailability,
   getAvailableVehicles,
+  getVehicleCategoryPricingOptions,
+  updateVehicleCategoryPricingOptions,
+  uploadVehicleImage,
 };

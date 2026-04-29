@@ -21,7 +21,8 @@ async function getBookingById(req, res, next) {
 async function createBooking(req, res, next) {
   try {
     const booking = await bookingService.createBooking(req.body);
-    res.status(201).json({ data: booking });
+    const confirmationSms = await bookingService.sendReservationConfirmationSms(booking);
+    res.status(201).json({ data: booking, confirmationSms });
   } catch (error) {
     next(error);
   }
@@ -30,6 +31,15 @@ async function createBooking(req, res, next) {
 async function updateBooking(req, res, next) {
   try {
     const booking = await bookingService.updateBooking(req.params.id, req.body);
+    res.json({ data: booking });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function swapBookingVehicle(req, res, next) {
+  try {
+    const booking = await bookingService.swapBookingVehicle(req.params.id, req.body);
     res.json({ data: booking });
   } catch (error) {
     next(error);
@@ -86,6 +96,7 @@ module.exports = {
   getBookingById,
   createBooking,
   updateBooking,
+  swapBookingVehicle,
   rescheduleBooking,
   changeBookingStatus,
   checkoutBooking,

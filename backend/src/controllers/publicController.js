@@ -1,12 +1,15 @@
 const bookingService = require("../services/bookingService");
-const { getAvailableVehicles } = require("./vehicleController");
+const { getAvailableVehicles, getVehicles } = require("./vehicleController");
 const paymentGateway = require("../services/paymentGateway");
+const { getDiscountSettings } = require("../services/discountSettingsService");
 
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org";
 const NOMINATIM_HEADERS = {
   Accept: "application/json",
   "User-Agent": "fleet-management/1.0 (public-reservation-geocoder)",
 };
+const GEOCODE_SEARCH_LIMIT = "25";
+const GEOCODE_RESPONSE_LIMIT = 25;
 
 function pickCity(address = {}) {
   return (
@@ -45,11 +48,17 @@ function mapGeocodeResult(item) {
   };
 }
 
+function stripLeadingStreetNumber(value = "") {
+  return String(value)
+    .replace(/^\s*\d+[A-Za-z\-]*\s+/, "")
+    .trim();
+}
+
 async function nominatimSearch(params) {
   const searchParams = new URLSearchParams({
     format: "jsonv2",
     addressdetails: "1",
-    limit: "10",
+    limit: GEOCODE_SEARCH_LIMIT,
     dedupe: "0",
     ...params,
   });
@@ -67,6 +76,14 @@ async function nominatimSearch(params) {
 
   const payload = await response.json();
   return Array.isArray(payload) ? payload : [];
+}
+
+async function nominatimSearchSafe(params) {
+  try {
+    return await nominatimSearch(params);
+  } catch {
+    return [];
+  }
 }
 
 async function getPublicGeocodeSearch(req, res, next) {
@@ -93,12 +110,28 @@ async function getPublicGeocodeSearch(req, res, next) {
     const freeformQuery =
       q || [addressLine, city, state, zip, "USA"].filter(Boolean).join(", ");
 
-    const [structuredResults, freeformResults] = await Promise.all([
-      nominatimSearch(structuredParams),
-      nominatimSearch({ q: freeformQuery, countrycodes: "us" }),
+    const streetWithoutNumber = stripLeadingStreetNumber(addressLine);
+    const fallbackStreetQuery =
+      streetWithoutNumber &&
+      streetWithoutNumber.toLowerCase() !== addressLine.toLowerCase()
+        ? [streetWithoutNumber, city, state, zip, "USA"].filter(Boolean).join(", ")
+        : "";
+
+    const localityQuery =
+      city && state ? [city, state, zip, "USA"].filter(Boolean).join(", ") : "";
+
+    const resultBatches = await Promise.all([
+      nominatimSearchSafe(structuredParams),
+      nominatimSearchSafe({ q: freeformQuery, countrycodes: "us" }),
+      fallbackStreetQuery
+        ? nominatimSearchSafe({ q: fallbackStreetQuery, countrycodes: "us" })
+        : Promise.resolve([]),
+      localityQuery
+        ? nominatimSearchSafe({ q: localityQuery, countrycodes: "us" })
+        : Promise.resolve([]),
     ]);
 
-    const merged = [...structuredResults, ...freeformResults];
+    const merged = resultBatches.flat();
     const uniqueByPlaceId = [];
     const seen = new Set();
 
@@ -109,7 +142,7 @@ async function getPublicGeocodeSearch(req, res, next) {
       uniqueByPlaceId.push(mapGeocodeResult(item));
     }
 
-    res.json({ data: uniqueByPlaceId.slice(0, 10) });
+    res.json({ data: uniqueByPlaceId.slice(0, GEOCODE_RESPONSE_LIMIT) });
   } catch (error) {
     next(error);
   }
@@ -300,6 +333,15 @@ async function createPublicReservation(req, res, next) {
   }
 }
 
+async function getPublicDiscountSettings(req, res, next) {
+  try {
+    const settings = await getDiscountSettings();
+    res.json({ data: settings });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function createTestPayment(req, res, next) {
   try {
     const payment = paymentGateway.charge(req.body);
@@ -311,6 +353,7 @@ async function createTestPayment(req, res, next) {
 
 module.exports = {
   getPublicAvailableVehicles: getAvailableVehicles,
+  getPublicVehicles: getVehicles,
   getPublicCustomerByContact,
   getPublicGuestBooking,
   checkoutPublicGuestBooking,
@@ -321,6 +364,7 @@ module.exports = {
   getPublicManageBooking,
   modifyPublicManageBooking,
   cancelPublicManageBooking,
+  getPublicDiscountSettings,
   getPublicGeocodeSearch,
   getPublicGeocodeReverse,
   createTestPayment,

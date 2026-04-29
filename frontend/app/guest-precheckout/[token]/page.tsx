@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import api from "../../../lib/api";
+import { formatBookingId } from "../../../lib/bookingId";
 
 type BookingInfo = {
   id: number;
@@ -158,7 +159,7 @@ export default function GuestPrecheckoutPage() {
 
         {booking && (
           <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-2">
-            <p className="text-sm text-zinc-700">Booking #{booking.id}</p>
+            <p className="text-sm text-zinc-700">Booking {formatBookingId(booking.id)}</p>
             <p className="text-sm text-zinc-700">
               Guest: {booking.customer?.firstName} {booking.customer?.lastName}
             </p>
