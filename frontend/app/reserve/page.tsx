@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../lib/api";
 
 const ChatWidget = dynamic(() => import("../components/ChatWidget"), { ssr: false });
+
 // Default discount tiers (empty by default)
 const DEFAULT_BOOKING_DISCOUNT_TIERS: { minDays: number; discountPercent: number }[] = [];
 
