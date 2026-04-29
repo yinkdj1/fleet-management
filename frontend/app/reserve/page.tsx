@@ -1585,7 +1585,7 @@ export default function ReservePage() {
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
-                <aside className="relative mx-auto aspect-[3/1] w-full max-w-[1307px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.2)] ring-1 ring-slate-200/60 reserve-surface-lift min-h-[240px] sm:min-h-[300px] md:min-h-[360px]">
+              <aside className="relative mx-auto aspect-[3/1] w-full max-w-[1307px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.2)] ring-1 ring-slate-200/60 reserve-surface-lift min-h-[180px] sm:min-h-[300px] md:min-h-[360px]">
                 <div className="absolute inset-0">
                   <img
                     src="/Newhero.png"
@@ -1596,71 +1596,67 @@ export default function ReservePage() {
                     style={{ objectPosition: "left top" }}
                   />
                 </div>
-                <div className="relative h-full">
-                  <div className="absolute left-1/2 bottom-2 w-[calc(100%-1rem)] -translate-x-1/2 grid gap-1 rounded-2xl border border-white/80 bg-white/95 p-1 shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] backdrop-blur reserve-card-reveal reserve-card-reveal-late reserve-surface-lift md:bottom-4 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:items-end md:p-2 lg:bottom-6 lg:w-[calc(100%-3rem)]">
-
-                  <div className="rounded-xl border border-slate-200 bg-white px-2 py-1.5">
-                    <p className={`${displayFont.className} text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700 md:text-xs`}>
-                      Pickup location
-                    </p>
-                    <p className={`${displayFont.className} mt-0.5 text-sm font-semibold text-zinc-900 md:text-sm`}>
-                      {pickupLocation}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-700 md:text-sm`}>Pickup date</label>
-                    <input
-                      type="datetime-local"
-                      name="pickupDatetime"
-                      value={form.pickupDatetime}
-                      onChange={handleChange}
-                      className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1.5 text-xs text-zinc-900 shadow-sm md:p-2 md:text-sm"
-                      required
-                    />
-                    {fieldErrors.pickupDatetime && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.pickupDatetime}</p>
+                <div className="relative h-full flex flex-col justify-end">
+                  <div className="w-full md:absolute md:left-1/2 md:bottom-2 md:-translate-x-1/2 md:w-[calc(100%-1rem)] md:grid md:gap-1 md:rounded-2xl md:border md:border-white/80 md:bg-white/95 md:p-1 md:shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] md:backdrop-blur md:reserve-card-reveal md:reserve-card-reveal-late md:reserve-surface-lift md:bottom-4 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:items-end md:p-2 lg:bottom-6 lg:w-[calc(100%-3rem)]">
+                    <div className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 mb-2 md:mb-0">
+                      <p className={`${displayFont.className} text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700 md:text-xs`}>
+                        Pickup location
+                      </p>
+                      <p className={`${displayFont.className} mt-0.5 text-sm font-semibold text-zinc-900 md:text-sm`}>
+                        {pickupLocation}
+                      </p>
+                    </div>
+                    <div className="mb-2 md:mb-0">
+                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-700 md:text-sm`}>Pickup date</label>
+                      <input
+                        type="datetime-local"
+                        name="pickupDatetime"
+                        value={form.pickupDatetime}
+                        onChange={handleChange}
+                        className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1.5 text-xs text-zinc-900 shadow-sm md:p-2 md:text-sm"
+                        required
+                      />
+                      {fieldErrors.pickupDatetime && (
+                        <p className="mt-1 text-sm text-red-600">{fieldErrors.pickupDatetime}</p>
+                      )}
+                    </div>
+                    <div className="mb-2 md:mb-0">
+                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-700 md:text-sm`}>Return date</label>
+                      <input
+                        type="datetime-local"
+                        name="returnDatetime"
+                        value={form.returnDatetime}
+                        onChange={handleChange}
+                        min={
+                          form.pickupDatetime
+                            ? getMinimumReturnDatetime(form.pickupDatetime)
+                            : undefined
+                        }
+                        className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1.5 text-xs text-zinc-900 shadow-sm md:p-2 md:text-sm"
+                        required
+                      />
+                      {fieldErrors.returnDatetime && (
+                        <p className="mt-1 text-sm text-red-600">{fieldErrors.returnDatetime}</p>
+                      )}
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleSearchCars}
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          handleSearchCars();
+                        }}
+                        className={`${displayFont.className} touch-manipulation relative z-[120] h-[34px] w-full rounded-xl bg-[linear-gradient(135deg,#2563eb,#0ea5e9)] px-2 py-1 text-[11px] font-semibold tracking-[0.01em] text-white shadow-[0_12px_24px_-12px_rgba(37,99,235,0.8)] transition active:scale-[0.99] hover:-translate-y-0.5 hover:shadow-[0_18px_30px_-14px_rgba(37,99,235,0.85)] md:h-[38px] md:px-2.5 md:py-1.5 md:text-sm`}
+                      >
+                        Search Cars
+                      </button>
+                    </div>
+                    {fieldErrors.vehicleId && (
+                      <p className="mt-2 text-sm text-red-200">{fieldErrors.vehicleId}</p>
                     )}
                   </div>
-
-                  <div>
-                    <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-700 md:text-sm`}>Return date</label>
-                    <input
-                      type="datetime-local"
-                      name="returnDatetime"
-                      value={form.returnDatetime}
-                      onChange={handleChange}
-                      min={
-                        form.pickupDatetime
-                          ? getMinimumReturnDatetime(form.pickupDatetime)
-                          : undefined
-                      }
-                      className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1.5 text-xs text-zinc-900 shadow-sm md:p-2 md:text-sm"
-                      required
-                    />
-                    {fieldErrors.returnDatetime && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.returnDatetime}</p>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleSearchCars}
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      handleSearchCars();
-                    }}
-                    className={`${displayFont.className} touch-manipulation relative z-[120] h-[34px] w-full rounded-xl bg-[linear-gradient(135deg,#2563eb,#0ea5e9)] px-2 py-1 text-[11px] font-semibold tracking-[0.01em] text-white shadow-[0_12px_24px_-12px_rgba(37,99,235,0.8)] transition active:scale-[0.99] hover:-translate-y-0.5 hover:shadow-[0_18px_30px_-14px_rgba(37,99,235,0.85)] md:h-[38px] md:px-2.5 md:py-1.5 md:text-sm`}
-                  >
-                    Search Cars
-                  </button>
-                  </div>
-
-
-                  {fieldErrors.vehicleId && (
-                    <p className="mt-2 text-sm text-red-200">{fieldErrors.vehicleId}</p>
-                  )}
-                </div> {/* End .relative h-full */}
+                </div>
               </aside>
             </div>
 
