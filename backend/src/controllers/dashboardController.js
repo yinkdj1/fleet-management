@@ -1,4 +1,23 @@
 const prisma = require("../config/db");
+const { getDiscountSettings, updateDiscountSettings } = require("../services/discountSettingsService");
+
+async function getDiscountSettingsHandler(req, res, next) {
+  try {
+    const settings = await getDiscountSettings();
+    res.json({ data: settings });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function updateDiscountSettingsHandler(req, res, next) {
+  try {
+    const updated = await updateDiscountSettings(req.body);
+    res.json({ data: updated });
+  } catch (error) {
+    next(error);
+  }
+}
 
 async function getDashboardSummary(req, res, next) {
   try {
@@ -35,4 +54,6 @@ async function getDashboardSummary(req, res, next) {
 
 module.exports = {
   getDashboardSummary,
+  getDiscountSettingsHandler,
+  updateDiscountSettingsHandler,
 };

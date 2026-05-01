@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import ChatWidget from "./components/ChatWidget";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,9 +22,7 @@ export const metadata: Metadata = {
   },
   icons: [
     { rel: "icon", url: "/Favi.png", type: "image/png" },
-    { rel: "icon", url: "/favicon.ico", type: "image/x-icon" },
     { rel: "apple-touch-icon", url: "/Favi.png" },
-    { rel: "shortcut icon", url: "/favicon.ico" },
   ],
 };
 
@@ -37,7 +36,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <ChatWidget />
+      </body>
     </html>
   );
 }
