@@ -52,8 +52,7 @@ export default function ChatWidget() {
     setLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      const response = await fetch(`${apiUrl}/api/ai/chat`, {
+      const response = await fetch(`/api/ai/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

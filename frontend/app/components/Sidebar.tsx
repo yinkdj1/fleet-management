@@ -5,16 +5,16 @@ import { usePathname, useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 
 const links = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/vehicles", label: "Vehicles" },
-  { href: "/customers", label: "Customers" },
   { href: "/bookings", label: "Bookings" },
-  { href: "/monitoring", label: "Monitoring" },
+  { href: "/coupon", label: "Coupons" },
+  { href: "/customers", label: "Customers" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/maintenance", label: "Maintenance" },
+  { href: "/monitoring", label: "Monitoring" },
   { href: "/notifications", label: "Notifications" },
   { href: "/reports", label: "Reports" },
-  { href: "/coupon", label: "Coupons" },
   { href: "/admin/users", label: "Staff Accounts" },
+  { href: "/vehicles", label: "Vehicles" },
 ];
 
 export default function Sidebar() {
@@ -30,7 +30,7 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 min-h-screen border-r border-amber-900/15 bg-[linear-gradient(180deg,rgba(255,252,246,0.96),rgba(248,239,224,0.95))] p-6 text-zinc-900">
-      <h2 className="mb-2 text-2xl font-bold font-[family-name:var(--font-playfair)] text-zinc-900">Fleet App</h2>
+      <h2 className="mb-2 text-2xl font-bold font-[family-name:var(--font-playfair)] text-zinc-900">Carsgidi</h2>
       <p className="mb-8 text-xs uppercase tracking-[0.18em] text-zinc-600">Operations Console</p>
 
       <nav className="space-y-3">
