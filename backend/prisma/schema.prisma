@@ -19,14 +19,17 @@ model User {
 }
 
 model PricingSettings {
-  id                    Int      @id
-  threeDayPercentage    Float    @default(5)
-  sevenDayPercentage    Float    @default(10)
-  fourteenDayPercentage Float    @default(15)
-  depositAmount         Float    @default(100)
-  pickupLocation        String   @default("Main Office")
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                       Int      @id
+  threeDayPercentage       Float    @default(5)
+  sevenDayPercentage       Float    @default(10)
+  fourteenDayPercentage    Float    @default(15)
+  depositAmount            Float    @default(100)
+  taxPercentage            Float    @default(7)
+  servicePlatformFeePerDay Float    @default(15)
+  protectionPlanFeePerDay  Float    @default(0)
+  pickupLocation           String   @default("Main Office")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 }
 
 model Vehicle {
