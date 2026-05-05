@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import api from "../../../lib/api";
 import { formatBookingId } from "../../../lib/bookingId";
+import { loadStripe } from "@stripe/stripe-js";
+
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
+);
 
 type BookingInfo = {
   id: number;
@@ -47,6 +52,7 @@ function buildImageUrl(fileUrl: string) {
 
 export default function GuestPrecheckoutPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const token = useMemo(() => String(params.token || ""), [params.token]);
 
   const [booking, setBooking] = useState<BookingInfo | null>(null);
@@ -54,6 +60,11 @@ export default function GuestPrecheckoutPage() {
   const [error, setError] = useState("");
   const [licenseUpload, setLicenseUpload] = useState<UploadState>(EMPTY_UPLOAD_STATE);
   const [selfieUpload, setSelfieUpload] = useState<UploadState>(EMPTY_UPLOAD_STATE);
+
+  // Stripe Identity state
+  const [identityVerified, setIdentityVerified] = useState(false);
+  const [identityLoading, setIdentityLoading] = useState(false);
+  const [identityError, setIdentityError] = useState("");
 
   const loadBooking = async () => {
     try {
@@ -69,6 +80,9 @@ export default function GuestPrecheckoutPage() {
       const selfieDoc = data?.documents?.find(
         (doc) => doc.documentType === "precheckout_selfie_with_license"
       );
+      const identityDoc = data?.documents?.find(
+        (doc) => doc.documentType === "stripe_identity_verified"
+      );
 
       setLicenseUpload((prev) => ({
         ...prev,
@@ -81,6 +95,8 @@ export default function GuestPrecheckoutPage() {
         done: Boolean(selfieDoc),
         fileUrl: selfieDoc?.fileUrl || "",
       }));
+
+      setIdentityVerified(Boolean(identityDoc));
     } catch (err: any) {
       setError(err.response?.data?.message || "This pre-checkout link is invalid or expired.");
     } finally {
@@ -93,6 +109,42 @@ export default function GuestPrecheckoutPage() {
       loadBooking();
     }
   }, [token]);
+
+  // If returning from Stripe Identity redirect, poll for verified status
+  useEffect(() => {
+    if (searchParams.get("identity") === "done" && token) {
+      const poll = setInterval(async () => {
+        const res = await api.get(`/public/precheckout/${token}`).catch(() => null);
+        const docs = res?.data?.data?.documents || [];
+        if (docs.find((d: any) => d.documentType === "stripe_identity_verified")) {
+          setIdentityVerified(true);
+          clearInterval(poll);
+        }
+      }, 2000);
+      // Stop polling after 30s
+      setTimeout(() => clearInterval(poll), 30000);
+    }
+  }, [searchParams, token]);
+
+  const startIdentityVerification = async () => {
+    setIdentityLoading(true);
+    setIdentityError("");
+    try {
+      const res = await api.post(`/public/precheckout/${token}/identity-session`, {
+        returnUrl: window.location.href.split("?")[0] + "?identity=done",
+      });
+      const { url } = res.data?.data || {};
+      if (url) {
+        window.location.href = url;
+      } else {
+        setIdentityError("Could not start verification. Please try again.");
+      }
+    } catch (err: any) {
+      setIdentityError(err.response?.data?.message || "Verification failed. Please try again.");
+    } finally {
+      setIdentityLoading(false);
+    }
+  };
 
   const uploadPhoto = async (file: File, documentType: "license" | "selfie") => {
     const setState = documentType === "license" ? setLicenseUpload : setSelfieUpload;
@@ -137,7 +189,7 @@ export default function GuestPrecheckoutPage() {
     await loadBooking();
   };
 
-  const completed = licenseUpload.done && selfieUpload.done;
+  const completed = identityVerified;
 
   return (
     <main className="min-h-screen bg-zinc-100 px-3 py-6 sm:px-6">
@@ -145,7 +197,7 @@ export default function GuestPrecheckoutPage() {
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h1 className="text-2xl font-bold text-zinc-900">Guest Pre-checkout</h1>
           <p className="mt-2 text-sm text-zinc-600">
-            Upload your driver license and a selfie while holding your license.
+            Verify your identity before picking up your vehicle. This takes about 1 minute.
           </p>
         </section>
 
@@ -169,10 +221,56 @@ export default function GuestPrecheckoutPage() {
           </section>
         )}
 
+        {/* Stripe Identity Verification */}
         {booking && (
+          <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-4">
+            <p className="font-semibold text-zinc-900">Identity Verification</p>
+
+            {identityVerified ? (
+              <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-4 py-3">
+                <svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <p className="text-sm font-medium text-green-800">Identity verified successfully</p>
+              </div>
+            ) : searchParams.get("identity") === "done" ? (
+              <div className="rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3">
+                <p className="text-sm text-yellow-800">Waiting for verification result...</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-zinc-600">
+                  We use Stripe Identity to securely verify your driver's license. Your data is encrypted and handled by Stripe.
+                </p>
+                <ul className="text-sm text-zinc-600 space-y-1 list-disc list-inside">
+                  <li>Take a photo of your driver's license</li>
+                  <li>Take a selfie for liveness check</li>
+                  <li>Results are instant</li>
+                </ul>
+                {identityError && (
+                  <p className="text-sm text-red-600">{identityError}</p>
+                )}
+                <button
+                  onClick={startIdentityVerification}
+                  disabled={identityLoading}
+                  className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-400 text-white py-3 text-sm font-semibold transition-colors"
+                >
+                  {identityLoading ? "Starting verification..." : "Verify My Identity"}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Optional manual upload (fallback) */}
+        {booking && !identityVerified && (
           <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-5">
+            <p className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+              Or upload manually (if verification above fails)
+            </p>
+
             <div className="space-y-2">
-              <p className="font-semibold text-zinc-900">1. Driver License</p>
+              <p className="font-semibold text-zinc-900">Driver License Photo</p>
               <input
                 type="file"
                 accept="image/*"
@@ -180,7 +278,7 @@ export default function GuestPrecheckoutPage() {
                 onChange={onLicenseChange}
                 className="block w-full text-sm"
               />
-              {licenseUpload.uploading && <p className="text-sm text-zinc-600">Uploading license...</p>}
+              {licenseUpload.uploading && <p className="text-sm text-zinc-600">Uploading...</p>}
               {licenseUpload.done && (
                 <div className="space-y-2">
                   <p className="text-sm text-green-700">License uploaded.</p>
@@ -191,13 +289,11 @@ export default function GuestPrecheckoutPage() {
                   />
                 </div>
               )}
-              {licenseUpload.error && (
-                <p className="text-sm text-red-700">{licenseUpload.error}</p>
-              )}
+              {licenseUpload.error && <p className="text-sm text-red-700">{licenseUpload.error}</p>}
             </div>
 
             <div className="space-y-2">
-              <p className="font-semibold text-zinc-900">2. Selfie Holding License</p>
+              <p className="font-semibold text-zinc-900">Selfie Holding License</p>
               <input
                 type="file"
                 accept="image/*"
@@ -205,7 +301,7 @@ export default function GuestPrecheckoutPage() {
                 onChange={onSelfieChange}
                 className="block w-full text-sm"
               />
-              {selfieUpload.uploading && <p className="text-sm text-zinc-600">Uploading selfie...</p>}
+              {selfieUpload.uploading && <p className="text-sm text-zinc-600">Uploading...</p>}
               {selfieUpload.done && (
                 <div className="space-y-2">
                   <p className="text-sm text-green-700">Selfie uploaded.</p>
@@ -216,17 +312,15 @@ export default function GuestPrecheckoutPage() {
                   />
                 </div>
               )}
-              {selfieUpload.error && (
-                <p className="text-sm text-red-700">{selfieUpload.error}</p>
-              )}
+              {selfieUpload.error && <p className="text-sm text-red-700">{selfieUpload.error}</p>}
             </div>
           </section>
         )}
 
-        {booking && completed && (
+        {completed && (
           <section className="rounded-2xl border border-green-200 bg-green-50 p-5 shadow-sm">
             <p className="text-sm font-semibold text-green-800">
-              Pre-checkout complete. Your verification photos were received in real time.
+              Pre-checkout complete. Your identity has been verified. See you at pickup!
             </p>
           </section>
         )}

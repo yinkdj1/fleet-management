@@ -25,6 +25,8 @@ const {
   honeypotGuard,
 } = require("../middleware/publicProtectionMiddleware");
 
+const { createIdentitySession } = require("../services/stripeIdentityService");
+
 const router = express.Router();
 
 const vehiclesRateLimiter = createRateLimiter({
@@ -54,6 +56,19 @@ router.get("/precheckout/:token", vehiclesRateLimiter, getPublicPrecheckoutBooki
 router.get("/manage/:token", vehiclesRateLimiter, getPublicManageBooking);
 router.patch("/manage/:token/modify", reservationRateLimiter, modifyPublicManageBooking);
 router.post("/manage/:token/cancel", reservationRateLimiter, cancelPublicManageBooking);
+// Stripe Identity — create verification session for a precheckout booking
+router.post("/precheckout/:token/identity-session", reservationRateLimiter, async (req, res, next) => {
+  try {
+    const { getPrecheckoutBookingByToken } = require("../services/bookingService");
+    const booking = await getPrecheckoutBookingByToken(req.params.token);
+    const returnUrl = req.body.returnUrl || `${process.env.FRONTEND_URL || "https://fleet-management-bay-ten.vercel.app"}/guest-precheckout/${req.params.token}?identity=done`;
+    const result = await createIdentitySession(booking.id, returnUrl);
+    res.json({ data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post(
   "/precheckout/:token/upload",
   reservationRateLimiter,

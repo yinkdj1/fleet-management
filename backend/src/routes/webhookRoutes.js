@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const twilio = require("twilio");
+const { handleIdentityWebhook } = require("../services/stripeIdentityService");
 
 /**
  * POST /api/webhooks/sms
@@ -47,5 +48,22 @@ function handleInboundSMS(from, body) {
   // Default: no auto-reply (or send a generic one)
   return null;
 }
+
+/**
+ * POST /api/webhooks/stripe-identity
+ * Stripe calls this when identity verification status changes.
+ * Configure in Stripe Dashboard → Webhooks → Add endpoint.
+ * Events: identity.verification_session.verified, identity.verification_session.requires_input
+ */
+router.post("/stripe-identity", async (req, res, next) => {
+  try {
+    const signature = req.headers["stripe-signature"];
+    // req.body is raw Buffer (set by express.raw in app.js)
+    const result = await handleIdentityWebhook(req.body, signature);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;
