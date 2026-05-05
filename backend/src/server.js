@@ -60,4 +60,7 @@ function startNotificationSchedulers() {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   startNotificationSchedulers();
+  // Trip monitoring agent: pickup reminders, midway check-ins, return reminders, daily fleet report
+  require("../agents/tripMonitoringAgent");
+  console.log("[TripMonitor] Agent started.");
 });
