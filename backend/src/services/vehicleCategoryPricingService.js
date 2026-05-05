@@ -3,14 +3,6 @@ const {
   ensureVehicleUsageSettingsForAllVehicles,
 } = require("./vehicleUsageService");
 
-const VEHICLE_CATEGORY_PRICING_TABLE_SQL = `
-  CREATE TABLE IF NOT EXISTS "VehicleCategoryPricing" (
-    "category" TEXT NOT NULL PRIMARY KEY,
-    "dailyRate" REAL NOT NULL,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )
-`;
-
 const DEFAULT_CATEGORY_RATES = {
   compact: 45,
   midsize: 55,
@@ -57,103 +49,43 @@ function normalizeCategoryRateMap(input = {}) {
 }
 
 async function ensureVehicleCategoryPricingTable() {
-  await prisma.$executeRawUnsafe(VEHICLE_CATEGORY_PRICING_TABLE_SQL);
-
+  // Seed default rows if missing
   for (const category of VALID_VEHICLE_CATEGORIES) {
-    await prisma.$executeRawUnsafe(
-      `
-        INSERT INTO "VehicleCategoryPricing" (
-          "category",
-          "dailyRate",
-          "updatedAt"
-        )
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT("category") DO NOTHING
-      `,
-      category,
-      DEFAULT_CATEGORY_RATES[category]
-    );
+    await prisma.vehicleCategoryPricing.upsert({
+      where: { category },
+      update: {},
+      create: { category, dailyRate: DEFAULT_CATEGORY_RATES[category] },
+    });
   }
 }
 
 async function getVehicleCategoryPricing() {
   await ensureVehicleCategoryPricingTable();
 
-  const rows = await prisma.$queryRawUnsafe(
-    'SELECT "category", "dailyRate", "updatedAt" FROM "VehicleCategoryPricing"'
-  );
+  const rows = await prisma.vehicleCategoryPricing.findMany();
 
   const map = normalizeCategoryRateMap();
-  for (const row of Array.isArray(rows) ? rows : []) {
+  for (const row of rows) {
     const category = sanitizeVehicleCategory(row.category, "");
     if (!category) continue;
     map[category] = sanitizeCategoryRate(row.dailyRate, map[category]);
   }
 
-  return {
-    rates: map,
-    categories: VALID_VEHICLE_CATEGORIES,
-  };
+  return { rates: map, categories: VALID_VEHICLE_CATEGORIES };
 }
 
 async function syncVehicleRatesByCategory(rateMap = {}) {
   await ensureVehicleUsageSettingsForAllVehicles();
 
-  await prisma.$executeRawUnsafe(
-    `
-      UPDATE "Vehicle"
-      SET "dailyRate" = ?
-      WHERE "id" IN (
-        SELECT "vehicleId"
-        FROM "VehicleUsageSettings"
-        WHERE lower("category") = ?
-      )
-    `,
-    sanitizeCategoryRate(rateMap.compact, DEFAULT_CATEGORY_RATES.compact),
-    "compact"
-  ).catch(() => null);
-
-  await prisma.$executeRawUnsafe(
-    `
-      UPDATE "Vehicle"
-      SET "dailyRate" = ?
-      WHERE "id" IN (
-        SELECT "vehicleId"
-        FROM "VehicleUsageSettings"
-        WHERE lower("category") = ?
-      )
-    `,
-    sanitizeCategoryRate(rateMap.midsize, DEFAULT_CATEGORY_RATES.midsize),
-    "midsize"
-  ).catch(() => null);
-
-  await prisma.$executeRawUnsafe(
-    `
-      UPDATE "Vehicle"
-      SET "dailyRate" = ?
-      WHERE "id" IN (
-        SELECT "vehicleId"
-        FROM "VehicleUsageSettings"
-        WHERE lower("category") = ?
-      )
-    `,
-    sanitizeCategoryRate(rateMap.suv, DEFAULT_CATEGORY_RATES.suv),
-    "suv"
-  ).catch(() => null);
-
-  await prisma.$executeRawUnsafe(
-    `
-      UPDATE "Vehicle"
-      SET "dailyRate" = ?
-      WHERE "id" IN (
-        SELECT "vehicleId"
-        FROM "VehicleUsageSettings"
-        WHERE lower("category") = ?
-      )
-    `,
-    sanitizeCategoryRate(rateMap.luxury, DEFAULT_CATEGORY_RATES.luxury),
-    "luxury"
-  ).catch(() => null);
+  for (const category of VALID_VEHICLE_CATEGORIES) {
+    const rate = sanitizeCategoryRate(rateMap[category], DEFAULT_CATEGORY_RATES[category]);
+    await prisma.vehicle.updateMany({
+      where: {
+        usageSettings: { category: { equals: category, mode: "insensitive" } },
+      },
+      data: { dailyRate: rate },
+    });
+  }
 }
 
 async function updateVehicleCategoryPricing(input = {}) {
@@ -168,23 +100,15 @@ async function updateVehicleCategoryPricing(input = {}) {
   };
 
   for (const category of VALID_VEHICLE_CATEGORIES) {
-    await prisma.$executeRawUnsafe(
-      `
-        UPDATE "VehicleCategoryPricing"
-        SET "dailyRate" = ?, "updatedAt" = CURRENT_TIMESTAMP
-        WHERE "category" = ?
-      `,
-      nextRates[category],
-      category
-    );
+    await prisma.vehicleCategoryPricing.update({
+      where: { category },
+      data: { dailyRate: nextRates[category] },
+    });
   }
 
   await syncVehicleRatesByCategory(nextRates);
 
-  return {
-    rates: nextRates,
-    categories: VALID_VEHICLE_CATEGORIES,
-  };
+  return { rates: nextRates, categories: VALID_VEHICLE_CATEGORIES };
 }
 
 function getRateForCategory(rates = {}, category = "compact") {

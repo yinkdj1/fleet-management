@@ -1,20 +1,5 @@
 const prisma = require("../config/db");
 
-const VEHICLE_USAGE_TABLE_SQL = `
-  CREATE TABLE IF NOT EXISTS "VehicleUsageSettings" (
-    "vehicleId" INTEGER NOT NULL PRIMARY KEY,
-    "category" TEXT NOT NULL DEFAULT 'compact',
-    "usageType" TEXT NOT NULL DEFAULT 'both',
-    "description" TEXT NOT NULL DEFAULT '',
-    "fuelType" TEXT NOT NULL DEFAULT '',
-    "transmission" TEXT NOT NULL DEFAULT '',
-    "passengers" INTEGER NOT NULL DEFAULT 0,
-    "dailyMileage" INTEGER NOT NULL DEFAULT 0,
-    "imageUrl" TEXT NOT NULL DEFAULT '',
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )
-`;
-
 const VALID_USAGE_TYPES = ["personal", "rideshare", "both"];
 const VALID_VEHICLE_CATEGORIES = ["compact", "midsize", "suv", "luxury", "unassigned"];
 
@@ -81,52 +66,25 @@ function sanitizeImageUrl(value, fallback = "") {
 }
 
 async function ensureVehicleUsageTable() {
-  await prisma.$executeRawUnsafe(VEHICLE_USAGE_TABLE_SQL);
-  await prisma.$executeRawUnsafe(
-    'ALTER TABLE "VehicleUsageSettings" ADD COLUMN "category" TEXT NOT NULL DEFAULT \'compact\''
-  ).catch(() => null);
-  await prisma.$executeRawUnsafe(
-    "ALTER TABLE \"VehicleUsageSettings\" ADD COLUMN \"description\" TEXT NOT NULL DEFAULT ''"
-  ).catch(() => null);
-  await prisma.$executeRawUnsafe(
-    "ALTER TABLE \"VehicleUsageSettings\" ADD COLUMN \"fuelType\" TEXT NOT NULL DEFAULT ''"
-  ).catch(() => null);
-  await prisma.$executeRawUnsafe(
-    "ALTER TABLE \"VehicleUsageSettings\" ADD COLUMN \"transmission\" TEXT NOT NULL DEFAULT ''"
-  ).catch(() => null);
-  await prisma.$executeRawUnsafe(
-    'ALTER TABLE "VehicleUsageSettings" ADD COLUMN "passengers" INTEGER NOT NULL DEFAULT 0'
-  ).catch(() => null);
-  await prisma.$executeRawUnsafe(
-    'ALTER TABLE "VehicleUsageSettings" ADD COLUMN "dailyMileage" INTEGER NOT NULL DEFAULT 0'
-  ).catch(() => null);
-  await prisma.$executeRawUnsafe(
-    "ALTER TABLE \"VehicleUsageSettings\" ADD COLUMN \"imageUrl\" TEXT NOT NULL DEFAULT ''"
-  ).catch(() => null);
+  // Table is managed by Prisma migrations — nothing to do here
 }
 
 async function ensureVehicleUsageSetting(vehicleId) {
-  await ensureVehicleUsageTable();
-
-  await prisma.$executeRawUnsafe(
-    `
-      INSERT INTO "VehicleUsageSettings" (
-        "vehicleId",
-        "category",
-        "usageType",
-        "description",
-        "fuelType",
-        "transmission",
-        "passengers",
-        "dailyMileage",
-        "imageUrl",
-        "updatedAt"
-      )
-      VALUES (?, 'compact', 'both', '', '', '', 0, 0, '', CURRENT_TIMESTAMP)
-      ON CONFLICT("vehicleId") DO NOTHING
-    `,
-    Number(vehicleId)
-  );
+  await prisma.vehicleUsageSettings.upsert({
+    where: { vehicleId: Number(vehicleId) },
+    update: {},
+    create: {
+      vehicleId: Number(vehicleId),
+      category: "compact",
+      usageType: "both",
+      description: "",
+      fuelType: "",
+      transmission: "",
+      passengers: 0,
+      dailyMileage: 0,
+      imageUrl: "",
+    },
+  });
 }
 
 async function ensureVehicleUsageSettingsForAllVehicles() {
@@ -142,14 +100,9 @@ async function ensureVehicleUsageSettingsForAllVehicles() {
 }
 
 async function getVehicleProfileById(vehicleId) {
-  await ensureVehicleUsageTable();
-
-  const rows = await prisma.$queryRawUnsafe(
-    'SELECT "vehicleId", "category", "usageType", "description", "fuelType", "transmission", "passengers", "dailyMileage", "imageUrl" FROM "VehicleUsageSettings" WHERE "vehicleId" = ? LIMIT 1',
-    Number(vehicleId)
-  );
-
-  const row = Array.isArray(rows) ? rows[0] : null;
+  const row = await prisma.vehicleUsageSettings.findUnique({
+    where: { vehicleId: Number(vehicleId) },
+  });
   return {
     category: sanitizeVehicleCategory(row?.category, "compact"),
     usageType: sanitizeUsageType(row?.usageType, "both"),
@@ -163,110 +116,57 @@ async function getVehicleProfileById(vehicleId) {
 }
 
 async function updateVehicleProfile(vehicleId, input = {}) {
-  await ensureVehicleUsageTable();
-
   const currentProfile = await getVehicleProfileById(vehicleId);
-  const nextUsageType =
-    input.usageType !== undefined
-      ? sanitizeUsageType(input.usageType, currentProfile.usageType)
-      : currentProfile.usageType;
-  const nextCategory =
-    input.category !== undefined
+
+  const data = {
+    category: input.category !== undefined
       ? sanitizeVehicleCategory(input.category, currentProfile.category)
-      : currentProfile.category;
-  const nextDescription =
-    input.description !== undefined
+      : currentProfile.category,
+    usageType: input.usageType !== undefined
+      ? sanitizeUsageType(input.usageType, currentProfile.usageType)
+      : currentProfile.usageType,
+    description: input.description !== undefined
       ? sanitizeVehicleDescription(input.description, currentProfile.description)
-      : currentProfile.description;
-  const nextFuelType =
-    input.fuelType !== undefined
+      : currentProfile.description,
+    fuelType: input.fuelType !== undefined
       ? sanitizeVehicleText(input.fuelType, currentProfile.fuelType)
-      : currentProfile.fuelType;
-  const nextTransmission =
-    input.transmission !== undefined
+      : currentProfile.fuelType,
+    transmission: input.transmission !== undefined
       ? sanitizeVehicleText(input.transmission, currentProfile.transmission)
-      : currentProfile.transmission;
-  const nextPassengers =
-    input.passengers !== undefined
+      : currentProfile.transmission,
+    passengers: input.passengers !== undefined
       ? sanitizePassengers(input.passengers, currentProfile.passengers)
-      : currentProfile.passengers;
-  const nextDailyMileage =
-    input.dailyMileage !== undefined
+      : currentProfile.passengers,
+    dailyMileage: input.dailyMileage !== undefined
       ? sanitizeDailyMileage(input.dailyMileage, currentProfile.dailyMileage)
-      : currentProfile.dailyMileage;
-  const nextImageUrl =
-    input.imageUrl !== undefined
+      : currentProfile.dailyMileage,
+    imageUrl: input.imageUrl !== undefined
       ? sanitizeImageUrl(input.imageUrl, currentProfile.imageUrl)
-      : currentProfile.imageUrl;
-
-  await prisma.$executeRawUnsafe(
-    `
-      INSERT INTO "VehicleUsageSettings" (
-        "vehicleId",
-        "category",
-        "usageType",
-        "description",
-        "fuelType",
-        "transmission",
-        "passengers",
-        "dailyMileage",
-        "imageUrl",
-        "updatedAt"
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT("vehicleId") DO UPDATE SET
-        "category" = excluded."category",
-        "usageType" = excluded."usageType",
-        "description" = excluded."description",
-        "fuelType" = excluded."fuelType",
-        "transmission" = excluded."transmission",
-        "passengers" = excluded."passengers",
-        "dailyMileage" = excluded."dailyMileage",
-        "imageUrl" = excluded."imageUrl",
-        "updatedAt" = CURRENT_TIMESTAMP
-    `,
-    Number(vehicleId),
-    nextCategory,
-    nextUsageType,
-    nextDescription,
-    nextFuelType,
-    nextTransmission,
-    nextPassengers,
-    nextDailyMileage,
-    nextImageUrl
-  );
-
-  return {
-    category: nextCategory,
-    usageType: nextUsageType,
-    description: nextDescription,
-    fuelType: nextFuelType,
-    transmission: nextTransmission,
-    passengers: nextPassengers,
-    dailyMileage: nextDailyMileage,
-    imageUrl: nextImageUrl,
+      : currentProfile.imageUrl,
   };
+
+  await prisma.vehicleUsageSettings.upsert({
+    where: { vehicleId: Number(vehicleId) },
+    update: data,
+    create: { vehicleId: Number(vehicleId), ...data },
+  });
+
+  return data;
 }
 
 async function getVehicleProfileMap(vehicleIds = []) {
-  await ensureVehicleUsageTable();
-
   const normalizedIds = vehicleIds
     .map((id) => Number(id))
     .filter((id) => Number.isFinite(id) && id > 0);
 
-  if (normalizedIds.length === 0) {
-    return {};
-  }
+  if (normalizedIds.length === 0) return {};
 
-  const placeholders = normalizedIds.map(() => "?").join(",");
-  const rows = await prisma.$queryRawUnsafe(
-    `SELECT "vehicleId", "category", "usageType", "description", "fuelType", "transmission", "passengers", "dailyMileage", "imageUrl" FROM "VehicleUsageSettings" WHERE "vehicleId" IN (${placeholders})`,
-    ...normalizedIds
-  );
+  const rows = await prisma.vehicleUsageSettings.findMany({
+    where: { vehicleId: { in: normalizedIds } },
+  });
 
   const map = {};
-  for (const row of Array.isArray(rows) ? rows : []) {
+  for (const row of rows) {
     map[Number(row.vehicleId)] = {
       category: sanitizeVehicleCategory(row.category, "compact"),
       usageType: sanitizeUsageType(row.usageType, "both"),
