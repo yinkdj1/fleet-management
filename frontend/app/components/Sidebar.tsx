@@ -14,6 +14,7 @@ const links = [
   { href: "/notifications", label: "Notifications" },
   { href: "/reports", label: "Reports" },
   { href: "/admin/users", label: "Staff Accounts" },
+  { href: "/settings", label: "Settings" },
   { href: "/vehicles", label: "Vehicles" },
 ];
 

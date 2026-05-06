@@ -1,5 +1,4 @@
 "use client";
-"use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ChangeEvent, FormEvent } from "react";
@@ -8,18 +7,17 @@ import api from "../../lib/api";
 export default function LoginPage() {
   const router = useRouter();
 
-  const [form, setForm] = useState({
-    email: "admin@example.com",
-    password: "Password123",
-  });
-
+  const [form, setForm] = useState({ email: "admin@example.com", password: "Password123" });
   const [error, setError] = useState("");
 
+  // 2FA state
+  const [requires2fa, setRequires2fa] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState<number | null>(null);
+  const [totpCode, setTotpCode] = useState("");
+  const [totpLoading, setTotpLoading] = useState(false);
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -29,9 +27,15 @@ export default function LoginPage() {
     try {
       const res = await api.post("/auth/login", form);
       const payload = res.data?.data || res.data;
+
+      if (payload.requires2fa) {
+        setPendingUserId(payload.userId);
+        setRequires2fa(true);
+        return;
+      }
+
       localStorage.setItem("token", payload.token);
       localStorage.setItem("user", JSON.stringify(payload.user));
-      // Set a cookie so Next.js middleware can protect routes server-side
       document.cookie = `token=${payload.token}; path=/; SameSite=Lax; max-age=604800`;
       router.push("/dashboard");
     } catch (err: unknown) {
@@ -40,6 +44,29 @@ export default function LoginPage() {
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : "";
       setError(errorMessage || "Login failed");
+    }
+  };
+
+  const handleTotpSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError("");
+    setTotpLoading(true);
+
+    try {
+      const res = await api.post("/auth/2fa/confirm", { userId: pendingUserId, token: totpCode });
+      const payload = res.data?.data || res.data;
+      localStorage.setItem("token", payload.token);
+      localStorage.setItem("user", JSON.stringify(payload.user));
+      document.cookie = `token=${payload.token}; path=/; SameSite=Lax; max-age=604800`;
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      const errorMessage =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : "";
+      setError(errorMessage || "Invalid code");
+    } finally {
+      setTotpLoading(false);
     }
   };
 
@@ -60,36 +87,73 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <form onSubmit={handleSubmit} className="fade-up p-7 sm:p-9">
-          <h2 className="text-3xl font-semibold text-zinc-900">Sign In</h2>
-          <p className="mt-2 text-sm text-zinc-600">Welcome back. Access your dashboard securely.</p>
+        {requires2fa ? (
+          <form onSubmit={handleTotpSubmit} className="fade-up p-7 sm:p-9">
+            <h2 className="text-3xl font-semibold text-zinc-900">Two-Factor Auth</h2>
+            <p className="mt-2 text-sm text-zinc-600">Open your authenticator app and enter the 6-digit code.</p>
 
-          {error && <p className="mt-4 rounded-xl border border-red-300/45 bg-red-500/15 px-3 py-2 text-sm text-red-100">{error}</p>}
+            {error && <p className="mt-4 rounded-xl border border-red-300/45 bg-red-500/15 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-          <label className="mt-6 block text-sm text-[var(--color-paper-soft)]">Email</label>
-          <input
-            name="email"
-            type="email"
-            value={form.email}
-            onChange={handleChange}
-            className="form-input-modern mt-2 w-full rounded-xl px-3 py-2.5 text-zinc-900"
-            placeholder="Email"
-          />
+            <label className="mt-6 block text-sm text-[var(--color-paper-soft)]">Authenticator Code</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={totpCode}
+              onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+              className="form-input-modern mt-2 w-full rounded-xl px-3 py-2.5 text-zinc-900 tracking-widest text-center text-xl"
+              placeholder="000000"
+              autoFocus
+            />
 
-          <label className="mt-5 block text-sm text-[var(--color-paper-soft)]">Password</label>
-          <input
-            name="password"
-            type="password"
-            value={form.password}
-            onChange={handleChange}
-            className="form-input-modern mt-2 w-full rounded-xl px-3 py-2.5 text-zinc-900"
-            placeholder="Password"
-          />
+            <button
+              type="submit"
+              disabled={totpLoading || totpCode.length !== 6}
+              className="attention-bounce mt-7 w-full rounded-xl bg-[var(--color-accent)] py-2.5 font-semibold text-[var(--color-ink)] transition hover:-translate-y-0.5 disabled:opacity-50"
+            >
+              {totpLoading ? "Verifying..." : "Verify & Sign In"}
+            </button>
 
-          <button type="submit" className="attention-bounce mt-7 w-full rounded-xl bg-[var(--color-accent)] py-2.5 font-semibold text-[var(--color-ink)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-14px_rgba(245,191,98,0.8)]">
-            Login
-          </button>
-        </form>
+            <button
+              type="button"
+              onClick={() => { setRequires2fa(false); setPendingUserId(null); setTotpCode(""); setError(""); }}
+              className="mt-3 w-full text-sm text-zinc-500 hover:text-zinc-700"
+            >
+              Back to login
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="fade-up p-7 sm:p-9">
+            <h2 className="text-3xl font-semibold text-zinc-900">Sign In</h2>
+            <p className="mt-2 text-sm text-zinc-600">Welcome back. Access your dashboard securely.</p>
+
+            {error && <p className="mt-4 rounded-xl border border-red-300/45 bg-red-500/15 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+            <label className="mt-6 block text-sm text-[var(--color-paper-soft)]">Email</label>
+            <input
+              name="email"
+              type="email"
+              value={form.email}
+              onChange={handleChange}
+              className="form-input-modern mt-2 w-full rounded-xl px-3 py-2.5 text-zinc-900"
+              placeholder="Email"
+            />
+
+            <label className="mt-5 block text-sm text-[var(--color-paper-soft)]">Password</label>
+            <input
+              name="password"
+              type="password"
+              value={form.password}
+              onChange={handleChange}
+              className="form-input-modern mt-2 w-full rounded-xl px-3 py-2.5 text-zinc-900"
+              placeholder="Password"
+            />
+
+            <button type="submit" className="attention-bounce mt-7 w-full rounded-xl bg-[var(--color-accent)] py-2.5 font-semibold text-[var(--color-ink)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-14px_rgba(245,191,98,0.8)]">
+              Login
+            </button>
+          </form>
+        )}
       </div>
     </main>
   );

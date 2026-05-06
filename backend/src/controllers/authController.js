@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const prisma = require("../config/db");
 const generateToken = require("../utils/generateToken");
+const twoFactorService = require("../services/twoFactorService");
 
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -85,6 +86,11 @@ async function login(req, res, next) {
       throw error;
     }
 
+    // If 2FA is enabled, don't issue a token yet — require TOTP code
+    if (user.twoFactorEnabled) {
+      return res.json({ data: { requires2fa: true, userId: user.id } });
+    }
+
     const token = generateToken(user);
     res.json({
       data: {
@@ -103,12 +109,82 @@ async function login(req, res, next) {
   }
 }
 
+/** POST /auth/2fa/confirm — validate TOTP code after password step, issue JWT */
+async function confirmLogin(req, res, next) {
+  try {
+    const { userId, token } = req.body;
+    if (!userId || !token) {
+      return res.status(400).json({ message: "userId and token are required" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
+    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+      return res.status(400).json({ message: "2FA not set up for this account" });
+    }
+
+    const valid = twoFactorService.verifyToken(user.twoFactorSecret, token);
+    if (!valid) return res.status(401).json({ message: "Invalid authenticator code" });
+
+    const jwt = generateToken(user);
+    res.json({
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        token: jwt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/** POST /auth/2fa/setup — generate secret + QR code (authenticated) */
+async function setup2fa(req, res, next) {
+  try {
+    const result = await twoFactorService.generateSetup(req.user.id);
+    res.json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/** POST /auth/2fa/enable — confirm code to activate 2FA (authenticated) */
+async function enable2fa(req, res, next) {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ message: "token is required" });
+    const result = await twoFactorService.enableTwoFactor(req.user.id, token);
+    res.json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/** POST /auth/2fa/disable — confirm code to deactivate 2FA (authenticated) */
+async function disable2fa(req, res, next) {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ message: "token is required" });
+    const result = await twoFactorService.disableTwoFactor(req.user.id, token);
+    res.json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
 function getMe(req, res) {
-  res.json({ data: req.user });
+  const { twoFactorSecret: _omit, passwordHash: _omit2, ...safeUser } = req.user;
+  res.json({ data: safeUser });
 }
 
 module.exports = {
   register,
   login,
   getMe,
+  confirmLogin,
+  setup2fa,
+  enable2fa,
+  disable2fa,
 };
