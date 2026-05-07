@@ -18,10 +18,13 @@ export default function AppShell({
         backgroundAttachment: "fixed",
       }}
     >
-      <Sidebar />
-      <div className="flex-1">
-        <Header />
-        <div className="p-6">{children}</div>
+      {/* white wash so the image is just a faint watermark */}
+      <div className="flex min-h-screen w-full bg-white/80">
+        <Sidebar />
+        <div className="flex-1">
+          <Header />
+          <div className="p-6">{children}</div>
+        </div>
       </div>
     </div>
   );
