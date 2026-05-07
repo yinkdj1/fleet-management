@@ -8,79 +8,69 @@ const NOMINATIM_HEADERS = {
   Accept: "application/json",
   "User-Agent": "fleet-management/1.0 (public-reservation-geocoder)",
 };
-const GEOCODE_SEARCH_LIMIT = "25";
-const GEOCODE_RESPONSE_LIMIT = 25;
 
-function pickCity(address = {}) {
-  return (
-    address.city ||
-    address.town ||
-    address.village ||
-    address.hamlet ||
-    address.municipality ||
-    ""
-  );
-}
+// Photon (komoot.io) — autocomplete-optimised OSM geocoder, no API key required
+const PHOTON_BASE_URL = "https://photon.komoot.io";
+const GEOCODE_RESPONSE_LIMIT = 10;
 
-function pickStreet(address = {}) {
-  const streetName =
-    address.road ||
-    address.pedestrian ||
-    address.footway ||
-    address.residential ||
-    address.path ||
-    "";
-  const houseNumber = address.house_number || "";
-  return [houseNumber, streetName].filter(Boolean).join(" ").trim();
-}
+// Rough bounding box for the contiguous US + AK + HI
+const US_BBOX = "-180,18,-65,72";
 
-function mapGeocodeResult(item) {
-  const address = item?.address || {};
+function mapPhotonFeature(feature) {
+  const props = feature?.properties || {};
+  const coords = feature?.geometry?.coordinates || [];
+  const lon = coords[0] != null ? String(coords[0]) : "";
+  const lat = coords[1] != null ? String(coords[1]) : "";
+
+  const housenumber = props.housenumber || "";
+  const street = props.street || props.name || "";
+  const addressLine = [housenumber, street].filter(Boolean).join(" ").trim();
+  const city = props.city || props.town || props.village || props.hamlet || props.municipality || "";
+  const state = props.state || "";
+  const zip = props.postcode || "";
+
+  const labelParts = [addressLine, city, state, zip].filter(Boolean);
+  const label = labelParts.length ? labelParts.join(", ") : (props.name || "");
+
   return {
-    id: String(item?.place_id || ""),
-    label: item?.display_name || "",
-    lat: item?.lat || "",
-    lon: item?.lon || "",
-    addressLine: pickStreet(address),
-    city: pickCity(address),
-    state: address.state || "",
-    zip: address.postcode || "",
+    id: String(props.osm_id || ""),
+    label,
+    lat,
+    lon,
+    addressLine,
+    city,
+    state,
+    zip,
   };
 }
 
-function stripLeadingStreetNumber(value = "") {
-  return String(value)
-    .replace(/^\s*\d+[A-Za-z\-]*\s+/, "")
-    .trim();
-}
-
-async function nominatimSearch(params) {
+async function photonSearch(query, { limit = GEOCODE_RESPONSE_LIMIT } = {}) {
   const searchParams = new URLSearchParams({
-    format: "jsonv2",
-    addressdetails: "1",
-    limit: GEOCODE_SEARCH_LIMIT,
-    dedupe: "0",
-    ...params,
+    q: query,
+    limit: String(limit),
+    lang: "en",
+    bbox: US_BBOX,
   });
 
   const response = await fetch(
-    `${NOMINATIM_BASE_URL}/search?${searchParams.toString()}`,
-    {
-      headers: NOMINATIM_HEADERS,
-    }
+    `${PHOTON_BASE_URL}/api/?${searchParams.toString()}`,
+    { headers: { Accept: "application/json", "User-Agent": "fleet-management/1.0" } }
   );
 
-  if (!response.ok) {
-    throw new Error("Address lookup failed");
-  }
+  if (!response.ok) throw new Error("Address lookup failed");
 
   const payload = await response.json();
-  return Array.isArray(payload) ? payload : [];
+  const features = Array.isArray(payload?.features) ? payload.features : [];
+
+  // Keep only US results (country_code may be 'us' or 'US')
+  return features.filter(
+    (f) => (f?.properties?.country_code || "").toLowerCase() === "us"
+  );
 }
 
-async function nominatimSearchSafe(params) {
+async function photonSearchSafe(query, opts) {
   try {
-    return await nominatimSearch(params);
+    return await photonSearch(query, opts);
   } catch {
     return [];
   }
@@ -94,55 +84,35 @@ async function getPublicGeocodeSearch(req, res, next) {
     const zip = String(req.query.zip || "").trim();
     const q = String(req.query.q || "").trim();
 
-    if (!addressLine && !q) {
+    const rawQuery = q || addressLine;
+    if (!rawQuery) {
       res.json({ data: [] });
       return;
     }
 
-    const structuredParams = {
-      street: addressLine || undefined,
-      city: city || undefined,
-      state: state || undefined,
-      postalcode: zip || undefined,
-      countrycodes: "us",
-    };
+    // Build a contextual query that appends known city/state/zip if provided
+    const contextParts = [rawQuery, city, state, zip].filter(Boolean);
+    const contextQuery = contextParts.join(", ");
 
-    const freeformQuery =
-      q || [addressLine, city, state, zip, "USA"].filter(Boolean).join(", ");
-
-    const streetWithoutNumber = stripLeadingStreetNumber(addressLine);
-    const fallbackStreetQuery =
-      streetWithoutNumber &&
-      streetWithoutNumber.toLowerCase() !== addressLine.toLowerCase()
-        ? [streetWithoutNumber, city, state, zip, "USA"].filter(Boolean).join(", ")
-        : "";
-
-    const localityQuery =
-      city && state ? [city, state, zip, "USA"].filter(Boolean).join(", ") : "";
-
-    const resultBatches = await Promise.all([
-      nominatimSearchSafe(structuredParams),
-      nominatimSearchSafe({ q: freeformQuery, countrycodes: "us" }),
-      fallbackStreetQuery
-        ? nominatimSearchSafe({ q: fallbackStreetQuery, countrycodes: "us" })
-        : Promise.resolve([]),
-      localityQuery
-        ? nominatimSearchSafe({ q: localityQuery, countrycodes: "us" })
+    // Run both the raw query and the context-enriched query in parallel
+    const [rawResults, contextResults] = await Promise.all([
+      photonSearchSafe(rawQuery, { limit: 10 }),
+      contextQuery !== rawQuery
+        ? photonSearchSafe(contextQuery, { limit: 10 })
         : Promise.resolve([]),
     ]);
 
-    const merged = resultBatches.flat();
-    const uniqueByPlaceId = [];
+    const merged = [...contextResults, ...rawResults];
     const seen = new Set();
-
-    for (const item of merged) {
-      const key = String(item?.place_id || "");
+    const unique = [];
+    for (const feature of merged) {
+      const key = String(feature?.properties?.osm_id || "");
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      uniqueByPlaceId.push(mapGeocodeResult(item));
+      unique.push(mapPhotonFeature(feature));
     }
 
-    res.json({ data: uniqueByPlaceId.slice(0, GEOCODE_RESPONSE_LIMIT) });
+    res.json({ data: unique.slice(0, GEOCODE_RESPONSE_LIMIT) });
   } catch (error) {
     next(error);
   }
