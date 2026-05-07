@@ -1663,7 +1663,7 @@ export default function ReservePage() {
               <section
                 className={`rounded-[30px] p-4 shadow-[0_28px_80px_-38px_rgba(15,23,42,0.2)] reserve-card-reveal reserve-card-reveal-delayed reserve-surface-lift md:p-5 ${
                   isShowingAvailableCars ? "md:min-h-[640px]" : ""
-                } ${isNightTheme ? "bg-slate-900 text-slate-100 night-mode-section" : "bg-white"}`}
+                } ${isNightTheme ? "bg-slate-800 text-slate-100 night-mode-section" : "bg-white"}`}
               >
                 <div className="flex flex-col gap-3 border-b border-black/5 pb-4 sm:flex-row sm:items-end sm:justify-between">
                   <div>
@@ -1686,7 +1686,7 @@ export default function ReservePage() {
                   )}
                 </div>
 
-                <div className={`mt-4 rounded-3xl p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-18px_rgba(15,23,42,0.4)] ${isNightTheme ? "bg-slate-800/80" : "bg-white/80"}`}>
+                <div className={`mt-4 rounded-3xl p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-18px_rgba(15,23,42,0.4)] ${isNightTheme ? "bg-slate-600/40" : "bg-white/80"}`}>
                   {isShowingAvailableCars && selectedVehicle ? (
                     <div className="grid grid-cols-1 gap-4 p-2 md:grid-cols-2">
                       <div className="group/preview-card relative overflow-hidden rounded-2xl bg-white/95 p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-22px_rgba(15,23,42,0.6)] hover:ring-2 hover:ring-slate-400/60">
