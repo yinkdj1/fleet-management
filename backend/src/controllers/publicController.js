@@ -62,9 +62,9 @@ async function photonSearch(query, { limit = GEOCODE_RESPONSE_LIMIT } = {}) {
   const payload = await response.json();
   const features = Array.isArray(payload?.features) ? payload.features : [];
 
-  // Keep only US results (country_code may be 'us' or 'US')
+  // Keep only US results — Photon uses 'countrycode' (no underscore)
   return features.filter(
-    (f) => (f?.properties?.country_code || "").toLowerCase() === "us"
+    (f) => (f?.properties?.countrycode || "").toLowerCase() === "us"
   );
 }
 
