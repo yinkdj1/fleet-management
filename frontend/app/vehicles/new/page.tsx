@@ -71,6 +71,45 @@ export default function NewVehiclePage() {
     loadCategoryPricing();
   }, []);
 
+  const [vinLoading, setVinLoading] = useState(false);
+  const [vinError, setVinError] = useState("");
+
+  const handleVinLookup = async (vin: string) => {
+    if (vin.length !== 17) return;
+    setVinLoading(true);
+    setVinError("");
+    try {
+      const res = await fetch(
+        `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`
+      );
+      const data = await res.json();
+      const results: { Variable: string; Value: string | null }[] = data.Results || [];
+
+      const get = (label: string) =>
+        results.find((r) => r.Variable === label)?.Value || "";
+
+      const make = get("Make");
+      const model = get("Model");
+      const year = get("Model Year");
+
+      if (!make && !model) {
+        setVinError("VIN not recognised. Please fill in details manually.");
+        return;
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        make: make || prev.make,
+        model: model || prev.model,
+        year: year || prev.year,
+      }));
+    } catch {
+      setVinError("VIN lookup failed. Please fill in details manually.");
+    } finally {
+      setVinLoading(false);
+    }
+  };
+
   const handleChange = (e: any) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
@@ -102,35 +141,59 @@ export default function NewVehiclePage() {
       {error && <p className="text-red-600 mb-4">{error}</p>}
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
-  <input
-    name="vin"
-    placeholder="VIN"
-    onChange={handleChange}
-    className="w-full p-3 border rounded"
-  />
+  <div className="space-y-1">
+    <div className="relative">
+      <input
+        name="vin"
+        placeholder="VIN (17 characters)"
+        value={form.vin}
+        onChange={(e) => {
+          const val = e.target.value.toUpperCase();
+          setForm((prev) => ({ ...prev, vin: val }));
+          setVinError("");
+          if (val.length === 17) handleVinLookup(val);
+        }}
+        maxLength={17}
+        className="w-full p-3 border rounded pr-10 form-input-modern"
+      />
+      {vinLoading && (
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 animate-pulse">
+          Looking up...
+        </span>
+      )}
+    </div>
+    {vinError && <p className="text-xs text-red-500">{vinError}</p>}
+    {!vinError && form.vin.length === 17 && !vinLoading && form.make && (
+      <p className="text-xs text-green-600">&#10003; Details auto-filled from VIN</p>
+    )}
+  </div>
   <input
     name="make"
     placeholder="Make"
+    value={form.make}
     onChange={handleChange}
-    className="w-full p-3 border rounded"
+    className="w-full p-3 border rounded form-input-modern"
   />
   <input
     name="model"
     placeholder="Model"
+    value={form.model}
     onChange={handleChange}
-    className="w-full p-3 border rounded"
+    className="w-full p-3 border rounded form-input-modern"
   />
   <input
     name="year"
     placeholder="Year"
+    value={form.year}
     onChange={handleChange}
-    className="w-full p-3 border rounded"
+    className="w-full p-3 border rounded form-input-modern"
   />
   <input
     name="plateNumber"
     placeholder="Plate Number"
+    value={form.plateNumber}
     onChange={handleChange}
-    className="w-full p-3 border rounded"
+    className="w-full p-3 border rounded form-input-modern"
   />
   <select
     name="category"
@@ -165,21 +228,24 @@ export default function NewVehiclePage() {
   <textarea
     name="description"
     placeholder="Vehicle description"
+    value={form.description}
     onChange={handleChange}
-    className="w-full p-3 border rounded min-h-24"
+    className="w-full p-3 border rounded min-h-24 form-input-modern"
     maxLength={400}
   />
   <input
     name="dailyMileage"
     placeholder="Daily Mileage"
+    value={form.dailyMileage}
     onChange={handleChange}
-    className="w-full p-3 border rounded"
+    className="w-full p-3 border rounded form-input-modern"
   />
   <input
     name="imageUrl"
     placeholder="Vehicle Image URL"
+    value={form.imageUrl}
     onChange={handleChange}
-    className="w-full p-3 border rounded"
+    className="w-full p-3 border rounded form-input-modern"
     required
   />
 
