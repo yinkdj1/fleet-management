@@ -1700,7 +1700,7 @@ export default function ReservePage() {
                         <img
                           src={
                             selectedVehicle.imageUrl
-                              ? `http://localhost:5000${selectedVehicle.imageUrl}`
+                              ? (selectedVehicle.imageUrl.startsWith('http') ? selectedVehicle.imageUrl : `http://localhost:5000${selectedVehicle.imageUrl}`)
                               : "/placeholder-vehicle.svg"
                           }
                           alt={`${selectedVehicle.make} ${selectedVehicle.model}`}
@@ -2030,7 +2030,7 @@ export default function ReservePage() {
                               <img
                                 src={
                                   vehicle.imageUrl
-                                    ? `http://localhost:5000${vehicle.imageUrl}`
+                                    ? (vehicle.imageUrl.startsWith('http') ? vehicle.imageUrl : `http://localhost:5000${vehicle.imageUrl}`)
                                     : "/placeholder-vehicle.svg"
                                 }
                                 alt={`${vehicle.make} ${vehicle.model}`}

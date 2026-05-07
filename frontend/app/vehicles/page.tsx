@@ -726,7 +726,7 @@ export default function VehiclesPage() {
                   <td className="p-4">
                     {vehicle.imageUrl ? (
                       <img
-                        src={`http://localhost:5000${vehicle.imageUrl}`}
+                        src={vehicle.imageUrl.startsWith('http') ? vehicle.imageUrl : `http://localhost:5000${vehicle.imageUrl}`}
                         alt={`${vehicle.make} ${vehicle.model}`}
                         className="h-12 w-16 rounded-lg object-cover border border-gray-200"
                       />
