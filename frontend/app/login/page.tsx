@@ -71,7 +71,14 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[var(--color-ink)] px-5 py-12 text-[var(--color-paper)]">
+    <main
+      className="relative isolate flex min-h-screen items-center justify-center overflow-hidden px-5 py-12 text-[var(--color-paper)]"
+      style={{
+        backgroundImage: "url('/Newhero.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
       <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-[var(--color-accent)]/25 blur-3xl orb-float" />
       <div className="pointer-events-none absolute -right-20 bottom-8 h-72 w-72 rounded-full bg-[var(--color-cyan)]/25 blur-3xl orb-float-delayed" />
 
