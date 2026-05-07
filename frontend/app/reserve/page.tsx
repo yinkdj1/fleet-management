@@ -2554,7 +2554,7 @@ export default function ReservePage() {
                         rel="noopener noreferrer"
                         className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${isNightTheme ? "border-slate-500 bg-slate-600 text-slate-100 hover:bg-slate-500" : "border-slate-300 bg-white text-zinc-800 hover:bg-slate-50"}`}
                       >
-                        View Full Georgia Terms
+                        View Full Rental Terms
                       </a>
                       <span className="text-xs text-zinc-600">
                         Open the terms link to review full conditions.
