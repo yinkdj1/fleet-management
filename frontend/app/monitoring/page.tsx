@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import AppShell from "../components/AppShell";
 
 interface TripAlert {
   bookingId: number;
@@ -30,19 +31,21 @@ export default function MonitoringPage() {
   }, []);
 
   return (
-    <main className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Trip Monitoring</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p className="text-red-600">{error}</p>}
-      {!loading && alerts.length === 0 && <p>No issues detected.</p>}
-      <ul className="space-y-3">
-        {alerts.map((alert) => (
-          <li key={alert.bookingId + alert.type} className="rounded border p-4 bg-yellow-50 border-yellow-300">
-            <div className="font-semibold">Booking #{alert.bookingId}</div>
-            <div className="text-sm text-yellow-800">{alert.message}</div>
-          </li>
-        ))}
-      </ul>
-    </main>
+    <AppShell>
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-2xl font-bold mb-4 text-zinc-900">Trip Monitoring</h1>
+        {loading && <p className="text-zinc-600">Loading...</p>}
+        {error && <p className="text-red-600">{error}</p>}
+        {!loading && alerts.length === 0 && <p className="text-zinc-600">No issues detected.</p>}
+        <ul className="space-y-3">
+          {alerts.map((alert) => (
+            <li key={alert.bookingId + alert.type} className="rounded-xl border border-yellow-300 p-4 bg-yellow-50">
+              <div className="font-semibold text-zinc-900">Booking #{alert.bookingId}</div>
+              <div className="text-sm text-yellow-800">{alert.message}</div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </AppShell>
   );
 }
