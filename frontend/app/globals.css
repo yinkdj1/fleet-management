@@ -24,3 +24,23 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Shared input/select/textarea hover + focus styles */
+.form-input-modern {
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  outline: none;
+}
+
+.form-input-modern:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.15);
+}
+
+.form-input-modern:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
