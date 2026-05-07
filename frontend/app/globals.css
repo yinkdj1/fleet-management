@@ -47,8 +47,15 @@ body {
 
 /* Night mode overrides for reserve page customer fields */
 .night-mode-section label {
-  color: #e2e8f0 !important; /* slate-200 — bright enough on dark bg */
+  color: #e2e8f0 !important; /* slate-200 */
 }
+
+/* Make all zinc text readable on dark backgrounds */
+.night-mode-section .text-zinc-900 { color: #f1f5f9 !important; }
+.night-mode-section .text-zinc-800 { color: #e2e8f0 !important; }
+.night-mode-section .text-zinc-700 { color: #cbd5e1 !important; }
+.night-mode-section .text-zinc-600 { color: #94a3b8 !important; }
+.night-mode-section .text-zinc-500 { color: #64748b !important; }
 
 .night-mode-section .form-input-modern {
   background: #1e293b !important; /* slate-800 */

@@ -1686,7 +1686,7 @@ export default function ReservePage() {
                   )}
                 </div>
 
-                <div className={`mt-4 rounded-3xl p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-18px_rgba(15,23,42,0.4)] ${isNightTheme ? "bg-slate-600/40" : "bg-white/80"}`}>
+                <div className={`mt-4 rounded-3xl p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-18px_rgba(15,23,42,0.4)] ${isNightTheme ? "bg-slate-500/20" : "bg-white/80"}`}>
                   {isShowingAvailableCars && selectedVehicle ? (
                     <div className="grid grid-cols-1 gap-4 p-2 md:grid-cols-2">
                       <div className="group/preview-card relative overflow-hidden rounded-2xl bg-white/95 p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-22px_rgba(15,23,42,0.6)] hover:ring-2 hover:ring-slate-400/60">
@@ -2512,7 +2512,7 @@ export default function ReservePage() {
                   </div>
 
                   <div
-                    className="md:col-span-2 xl:col-span-4 rounded-2xl border border-slate-200 bg-slate-50/90 p-4 space-y-3 backdrop-blur animate-stagger"
+                    className={`md:col-span-2 xl:col-span-4 rounded-2xl p-4 space-y-3 backdrop-blur animate-stagger ${isNightTheme ? "border border-slate-600 bg-slate-700/60" : "border border-slate-200 bg-slate-50/90"}`}
                     style={{ "--anim-delay": "200ms" } as React.CSSProperties}
                   >
                     <p className="text-sm font-semibold text-zinc-900">
@@ -2552,7 +2552,7 @@ export default function ReservePage() {
                         href="/ga-rental-terms"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-slate-50"
+                        className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${isNightTheme ? "border-slate-500 bg-slate-600 text-slate-100 hover:bg-slate-500" : "border-slate-300 bg-white text-zinc-800 hover:bg-slate-50"}`}
                       >
                         View Full Georgia Terms
                       </a>
