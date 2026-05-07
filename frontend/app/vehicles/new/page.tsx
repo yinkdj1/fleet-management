@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "../../../lib/api";
 import AppShell from "../../components/AppShell";
@@ -36,8 +36,12 @@ export default function NewVehiclePage() {
     usageType: "both",
     description: "",
     dailyMileage: "",
-    imageUrl: "",
   });
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [categoryPricing, setCategoryPricing] = useState<CategoryPricingSettings>({
     rates: {
       compact: 45,
@@ -114,19 +118,35 @@ export default function NewVehiclePage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const handleImageSelect = (file: File) => {
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
   const handleSubmit = async (e: any) => {
     e.preventDefault();
 
-    if (!form.imageUrl.trim()) {
-      setError("Vehicle image URL is required");
+    if (!imageFile) {
+      setError("Vehicle image is required");
       return;
     }
 
     try {
-      await api.post("/vehicles", {
+      // Step 1: create the vehicle
+      const createRes = await api.post("/vehicles", {
         ...form,
         year: Number(form.year),
       });
+      const vehicleId = createRes.data?.data?.id;
+
+      // Step 2: upload the image
+      if (vehicleId) {
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        await api.post(`/vehicles/${vehicleId}/image`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
 
       router.push("/vehicles");
     } catch (err: any) {
@@ -240,14 +260,61 @@ export default function NewVehiclePage() {
     onChange={handleChange}
     className="w-full p-3 border rounded form-input-modern"
   />
-  <input
-    name="imageUrl"
-    placeholder="Vehicle Image URL"
-    value={form.imageUrl}
-    onChange={handleChange}
-    className="w-full p-3 border rounded form-input-modern"
-    required
-  />
+  {/* Image upload */}
+  <div className="space-y-2">
+    <p className="text-sm font-medium text-zinc-700">Vehicle Image</p>
+    <div className="flex gap-3">
+      {/* Gallery / file picker */}
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        className="flex-1 rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 hover:border-blue-400 hover:bg-blue-50 px-4 py-3 text-sm text-zinc-600 hover:text-blue-700 transition-colors"
+      >
+        📁 Choose from device
+      </button>
+      {/* Live camera */}
+      <button
+        type="button"
+        onClick={() => cameraInputRef.current?.click()}
+        className="flex-1 rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 hover:border-green-400 hover:bg-green-50 px-4 py-3 text-sm text-zinc-600 hover:text-green-700 transition-colors"
+      >
+        📷 Take photo
+      </button>
+    </div>
+    {/* Hidden inputs */}
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={(e) => { if (e.target.files?.[0]) handleImageSelect(e.target.files[0]); }}
+    />
+    <input
+      ref={cameraInputRef}
+      type="file"
+      accept="image/*"
+      capture="environment"
+      className="hidden"
+      onChange={(e) => { if (e.target.files?.[0]) handleImageSelect(e.target.files[0]); }}
+    />
+    {/* Preview */}
+    {imagePreview && (
+      <div className="relative">
+        <img
+          src={imagePreview}
+          alt="Vehicle preview"
+          className="w-full max-h-48 rounded-xl border border-zinc-200 object-cover"
+        />
+        <button
+          type="button"
+          onClick={() => { setImageFile(null); setImagePreview(null); }}
+          className="absolute top-2 right-2 rounded-full bg-black/60 text-white text-xs px-2 py-1 hover:bg-black/80"
+        >
+          ✕ Remove
+        </button>
+      </div>
+    )}
+  </div>
 
   <button className="bg-black text-white px-4 py-2 rounded">
     Create Vehicle
