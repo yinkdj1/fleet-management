@@ -1689,7 +1689,7 @@ export default function ReservePage() {
                 <div className={`mt-4 rounded-3xl p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_16px_28px_-18px_rgba(15,23,42,0.4)] ${isNightTheme ? "bg-slate-500/20" : "bg-white/80"}`}>
                   {isShowingAvailableCars && selectedVehicle ? (
                     <div className="grid grid-cols-1 gap-4 p-2 md:grid-cols-2">
-                      <div className="group/preview-card relative overflow-hidden rounded-2xl bg-white/95 p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-22px_rgba(15,23,42,0.6)] hover:ring-2 hover:ring-slate-400/60">
+                      <div className="group/preview-card preserve-light-text relative overflow-hidden rounded-2xl bg-white/95 p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-22px_rgba(15,23,42,0.6)] hover:ring-2 hover:ring-slate-400/60">
                         <span
                           aria-hidden="true"
                           className="pointer-events-none absolute inset-0 rounded-2xl bg-slate-900/0 transition duration-200 group-hover/preview-card:bg-slate-900/14"
@@ -1779,7 +1779,7 @@ export default function ReservePage() {
                         </p>
                       </div>
 
-                      <div className="group/preview-card relative overflow-hidden rounded-2xl bg-white p-3 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-22px_rgba(15,23,42,0.6)] hover:ring-2 hover:ring-slate-400/60">
+                      <div className="group/preview-card preserve-light-text relative overflow-hidden rounded-2xl bg-white p-3 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_48px_-22px_rgba(15,23,42,0.6)] hover:ring-2 hover:ring-slate-400/60">
                         <span
                           aria-hidden="true"
                           className="pointer-events-none absolute inset-0 rounded-2xl bg-slate-900/0 transition duration-200 group-hover/preview-card:bg-slate-900/14"
