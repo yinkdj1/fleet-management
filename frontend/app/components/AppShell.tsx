@@ -19,7 +19,7 @@ export default function AppShell({
       }}
     >
       {/* dark overlay so content stays readable */}
-      <div className="flex min-h-screen w-full bg-black/45">
+        <div className="flex min-h-screen w-full bg-black/20">
         <Sidebar />
         <div className="flex-1">
           <Header />
