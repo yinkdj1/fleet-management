@@ -16,6 +16,63 @@ const GEOCODE_RESPONSE_LIMIT = 10;
 // Rough bounding box for the contiguous US + AK + HI
 const US_BBOX = "-180,18,-65,72";
 
+// ---------------------------------------------------------------------------
+// Mapbox Geocoding (used when MAPBOX_API_KEY env var is set)
+// ---------------------------------------------------------------------------
+function mapMapboxFeature(feature) {
+  const context = Array.isArray(feature?.context) ? feature.context : [];
+  const find = (id) => context.find((c) => c.id?.startsWith(id))?.text || "";
+
+  const placeName = feature?.place_name || "";
+  const coords = feature?.center || [];
+  const lon = coords[0] != null ? String(coords[0]) : "";
+  const lat = coords[1] != null ? String(coords[1]) : "";
+
+  // address_line is the first token before the first comma in place_name
+  const addressLine = (feature?.place_name || "").split(",")[0]?.trim() || "";
+  const city = find("place") || find("locality") || find("neighborhood");
+  const state = find("region");
+  const zip = find("postcode");
+
+  return {
+    id: String(feature?.id || ""),
+    label: placeName,
+    lat,
+    lon,
+    addressLine,
+    city,
+    state,
+    zip,
+  };
+}
+
+async function mapboxSearch(query, { limit = GEOCODE_RESPONSE_LIMIT } = {}) {
+  const token = process.env.MAPBOX_API_KEY;
+  if (!token) throw new Error("MAPBOX_API_KEY not set");
+
+  const searchParams = new URLSearchParams({
+    access_token: token,
+    autocomplete: "true",
+    country: "us",
+    types: "address",
+    limit: String(limit),
+  });
+
+  const encoded = encodeURIComponent(query);
+  const response = await fetch(
+    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?${searchParams.toString()}`,
+    { headers: { Accept: "application/json" } }
+  );
+
+  if (!response.ok) throw new Error("Mapbox geocoding failed");
+
+  const payload = await response.json();
+  return Array.isArray(payload?.features) ? payload.features : [];
+}
+
+// ---------------------------------------------------------------------------
+// Photon fallback
+// ---------------------------------------------------------------------------
 function mapPhotonFeature(feature) {
   const props = feature?.properties || {};
   const coords = feature?.geometry?.coordinates || [];
@@ -62,18 +119,9 @@ async function photonSearch(query, { limit = GEOCODE_RESPONSE_LIMIT } = {}) {
   const payload = await response.json();
   const features = Array.isArray(payload?.features) ? payload.features : [];
 
-  // Keep only US results — Photon uses 'countrycode' (no underscore)
   return features.filter(
     (f) => (f?.properties?.countrycode || "").toLowerCase() === "us"
   );
-}
-
-async function photonSearchSafe(query, opts) {
-  try {
-    return await photonSearch(query, opts);
-  } catch {
-    return [];
-  }
 }
 
 async function getPublicGeocodeSearch(req, res, next) {
@@ -90,15 +138,28 @@ async function getPublicGeocodeSearch(req, res, next) {
       return;
     }
 
-    // Build a contextual query that appends known city/state/zip if provided
+    // Use Mapbox if key is configured, otherwise fall back to Photon
+    if (process.env.MAPBOX_API_KEY) {
+      try {
+        const contextParts = [rawQuery, city, state, zip].filter(Boolean);
+        const contextQuery = contextParts.join(", ");
+        const features = await mapboxSearch(contextQuery, { limit: GEOCODE_RESPONSE_LIMIT });
+        const results = features.map(mapMapboxFeature);
+        res.json({ data: results.slice(0, GEOCODE_RESPONSE_LIMIT) });
+        return;
+      } catch {
+        // fall through to Photon
+      }
+    }
+
+    // Photon fallback
     const contextParts = [rawQuery, city, state, zip].filter(Boolean);
     const contextQuery = contextParts.join(", ");
 
-    // Run both the raw query and the context-enriched query in parallel
     const [rawResults, contextResults] = await Promise.all([
-      photonSearchSafe(rawQuery, { limit: 10 }),
+      photonSearch(rawQuery, { limit: 10 }).catch(() => []),
       contextQuery !== rawQuery
-        ? photonSearchSafe(contextQuery, { limit: 10 })
+        ? photonSearch(contextQuery, { limit: 10 }).catch(() => [])
         : Promise.resolve([]),
     ]);
 
