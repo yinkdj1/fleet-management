@@ -58,11 +58,11 @@ function sanitizeImageUrl(value, fallback = "") {
     return fallback;
   }
   const trimmed = value.trim();
-  // Only allow server-generated upload paths
-  if (!trimmed.startsWith("/uploads/")) {
+  // Allow Cloudinary URLs or server-generated upload paths
+  if (!trimmed.startsWith("/uploads/") && !trimmed.startsWith("https://res.cloudinary.com/")) {
     return fallback;
   }
-  return trimmed.slice(0, 500);
+  return trimmed.slice(0, 1000);
 }
 
 async function ensureVehicleUsageTable() {
