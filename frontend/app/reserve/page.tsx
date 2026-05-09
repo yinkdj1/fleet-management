@@ -1704,7 +1704,7 @@ export default function ReservePage() {
                               : "/placeholder-vehicle.svg"
                           }
                           alt={`${selectedVehicle.make} ${selectedVehicle.model}`}
-                          className="mx-auto mt-3 aspect-[4/3] w-full max-w-sm rounded-xl border border-black/5 object-cover object-center shadow-sm"
+                          className="mx-auto mt-3 aspect-[4/3] w-full max-w-sm rounded-xl border border-black/5 object-contain object-center shadow-sm bg-gray-50"
                         />
                         <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-zinc-500">
                           <span className="flex items-center gap-1.5">

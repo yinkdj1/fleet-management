@@ -24,68 +24,130 @@ async function hasNotificationMarker(bookingId, type) {
 }
 
 async function sendPickupCheckinNotifications(booking) {
+  let links = null;
+  try { links = buildGuestManageLinks(booking); } catch { /* guest token unavailable */ }
+
+  const emailTemplate = await getActiveTemplate("pickup", "email");
+  const smsTemplate = await getActiveTemplate("pickup", "sms");
+
+  const firstName = booking.customer?.firstName || "Guest";
+  const vehicleLabel = `${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""}`.trim() || "your vehicle";
+
   // Guest
   if (booking.customer?.email) {
+    const subject = emailTemplate
+      ? renderSmsTemplate(emailTemplate.subject, booking, links)
+      : `Hi ${firstName}, it's time to check in your ${vehicleLabel}!`;
+    const body = emailTemplate
+      ? renderSmsTemplate(emailTemplate.body, booking, links)
+      : `Hi ${firstName}, your trip is starting now. Please check in your ${vehicleLabel} to get going. If you have any questions, don't hesitate to reach out.`;
     await sendEmail({
       to: booking.customer.email,
-      subject: `It's time to check in your vehicle!`,
-      html: `<p>Your trip is starting. Please check in your vehicle now.</p>`,
-      text: `Your trip is starting. Please check in your vehicle now.`,
+      subject,
+      html: `<p>${body}</p>`,
+      text: body,
     });
   }
   if (booking.customer?.phone && hasTwilioSmsConfig()) {
     const client = getTwilioClient();
+    const body = smsTemplate
+      ? renderSmsTemplate(smsTemplate.body, booking, links)
+      : `Hi ${firstName}, your ${vehicleLabel} trip is starting now! Please check in your vehicle. Need help? Call us.`;
     await client.messages.create({
       to: booking.customer.phone,
       from: process.env.TWILIO_FROM_NUMBER,
-      body: `Your trip is starting. Please check in your vehicle now.`,
+      body,
     });
   }
   // Admin
+  const guestName = `${booking.customer?.firstName || ""} ${booking.customer?.lastName || ""}`.trim() || "Guest";
   await sendEmail({
     to: ADMIN_EMAIL,
-    subject: `Guest pickup: check-in reminder`,
-    html: `<p>Booking #${booking.id} is scheduled for pickup now. Remember to check in the vehicle.</p>`,
-    text: `Booking #${booking.id} is scheduled for pickup now. Remember to check in the vehicle.`,
+    subject: `Pickup now: ${guestName} — Booking #${booking.id}`,
+    html: `<p>Booking #${booking.id} for ${guestName} (${vehicleLabel}) is scheduled for pickup now. Remember to check in the vehicle.</p>`,
+    text: `Booking #${booking.id} for ${guestName} (${vehicleLabel}) is scheduled for pickup now. Remember to check in the vehicle.`,
   });
 }
 
 async function sendMidwayCheckinNotifications(booking) {
+  let links = null;
+  try { links = buildGuestManageLinks(booking); } catch { /* guest token unavailable */ }
+
+  const emailTemplate = await getActiveTemplate("midpoint", "email");
+  const smsTemplate = await getActiveTemplate("midpoint", "sms");
+
+  const firstName = booking.customer?.firstName || "Guest";
+  const vehicleLabel = `${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""}`.trim() || "your vehicle";
+
+  const defaultExtendHtml = links
+    ? `<p>Hi ${firstName}, hope you're enjoying your ${vehicleLabel} rental! We're checking in to make sure everything is going smoothly. If you need to extend your trip, <a href="${links.modifyUrl}">click here</a>. We're here if you need anything!</p>`
+    : `<p>Hi ${firstName}, hope you're enjoying your ${vehicleLabel} rental! We're checking in to make sure everything is going smoothly. If you need to extend your trip or need any assistance, please contact us.</p>`;
+  const defaultExtendText = links
+    ? `Hi ${firstName}, hope you're enjoying your ${vehicleLabel} rental! Need to extend? ${links.modifyUrl}`
+    : `Hi ${firstName}, hope you're enjoying your ${vehicleLabel} rental! Need to extend or need help? Please contact us.`;
+
   // Guest
   if (booking.customer?.email) {
+    const subject = emailTemplate
+      ? renderSmsTemplate(emailTemplate.subject, booking, links)
+      : `Hi ${firstName}, how's your ${vehicleLabel} trip going?`;
+    const body = emailTemplate
+      ? renderSmsTemplate(emailTemplate.body, booking, links)
+      : null;
     await sendEmail({
       to: booking.customer.email,
-      subject: `Midway check-in: How is your trip?`,
-      html: `<p>Hope your trip is going well! If you need to extend, <a href="${buildGuestManageLinks(booking).modifyUrl}">click here</a>.</p>`,
-      text: `Hope your trip is going well! If you need to extend, use your guest link.`,
+      subject,
+      html: body ? `<p>${body}</p>` : defaultExtendHtml,
+      text: body || defaultExtendText,
     });
   }
   if (booking.customer?.phone && hasTwilioSmsConfig()) {
     const client = getTwilioClient();
+    const body = smsTemplate
+      ? renderSmsTemplate(smsTemplate.body, booking, links)
+      : defaultExtendText;
     await client.messages.create({
       to: booking.customer.phone,
       from: process.env.TWILIO_FROM_NUMBER,
-      body: `Hope your trip is going well! If you need to extend, use your guest link.`,
+      body,
     });
   }
 }
 
 async function sendDropoffThankYouNotifications(booking) {
+  let links = null;
+  try { links = buildGuestManageLinks(booking); } catch { /* guest token unavailable */ }
+
+  const emailTemplate = await getActiveTemplate("return", "email");
+  const smsTemplate = await getActiveTemplate("return", "sms");
+
+  const firstName = booking.customer?.firstName || "Guest";
+  const vehicleLabel = `${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""}`.trim() || "your vehicle";
+
   // Guest
   if (booking.customer?.email) {
+    const subject = emailTemplate
+      ? renderSmsTemplate(emailTemplate.subject, booking, links)
+      : `Thank you for renting with Carsgidi, ${firstName}!`;
+    const body = emailTemplate
+      ? renderSmsTemplate(emailTemplate.body, booking, links)
+      : `Hi ${firstName}, thank you for renting the ${vehicleLabel} with Carsgidi! We hope you had a wonderful trip. We'd love to have you back — visit carsgidi.com to book your next ride.`;
     await sendEmail({
       to: booking.customer.email,
-      subject: `Thank you for renting with us!`,
-      html: `<p>Thank you for renting with us. We hope you had a great trip!</p>`,
-      text: `Thank you for renting with us. We hope you had a great trip!`,
+      subject,
+      html: `<p>${body}</p>`,
+      text: body,
     });
   }
   if (booking.customer?.phone && hasTwilioSmsConfig()) {
     const client = getTwilioClient();
+    const body = smsTemplate
+      ? renderSmsTemplate(smsTemplate.body, booking, links)
+      : `Hi ${firstName}, thanks for renting the ${vehicleLabel} with Carsgidi! We hope you had a great trip. See you next time!`;
     await client.messages.create({
       to: booking.customer.phone,
       from: process.env.TWILIO_FROM_NUMBER,
-      body: `Thank you for renting with us. We hope you had a great trip!`,
+      body,
     });
   }
 }
@@ -256,15 +318,22 @@ function renderSmsTemplate(body, booking, links) {
 }
 
 /**
- * Find the first active SMS template for a given anchor (e.g. "booking_created").
+ * Find the first active template for a given anchor and channel.
  */
-async function getActiveSmsTemplate(anchor) {
+async function getActiveTemplate(anchor, channel) {
   try {
     const templates = await listNotificationTemplates();
-    return templates.find((t) => t.channel === "sms" && t.anchor === anchor && t.isActive) || null;
+    return templates.find((t) => t.channel === channel && t.anchor === anchor && t.isActive) || null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Find the first active SMS template for a given anchor (e.g. "booking_created").
+ */
+async function getActiveSmsTemplate(anchor) {
+  return getActiveTemplate(anchor, "sms");
 }
 
 function normalizePhone(value) {
@@ -2353,4 +2422,6 @@ module.exports = {
   processBookingNotifications,
   sendReservationConfirmationSms,
   buildGuestManageLinks,
+  getActiveTemplate,
+  renderSmsTemplate,
 };

@@ -182,3 +182,31 @@ model VehicleCategoryPricing {
   dailyRate Float
   updatedAt DateTime @updatedAt
 }
+
+model NotificationTemplate {
+  id            Int      @id @default(autoincrement())
+  name          String
+  channel       String   // "email" | "sms"
+  subject       String   @default("")
+  body          String
+  anchor        String   // "booking_created" | "pickup" | "return" | "midpoint" | "precheckout" | "overdue"
+  timing        String   @default("before") // "before" | "after" | "exact"
+  offsetMinutes Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model NotificationTemplate {
+  id            Int      @id @default(autoincrement())
+  name          String
+  channel       String   // "email" | "sms"
+  subject       String   @default("")
+  body          String
+  anchor        String   // "booking_created" | "pickup" | "return" | "midpoint" | "precheckout" | "overdue"
+  timing        String   @default("before") // "before" | "after" | "exact"
+  offsetMinutes Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

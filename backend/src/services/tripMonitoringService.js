@@ -74,14 +74,25 @@ async function monitorTrips() {
         await markExtensionOfferSent(booking.id);
       } else {
         // Check if ignored for > EXTENSION_IGNORE_HOURS
-        const sentTime = marker.fileUrl?.split(":")[1];
+        const sentTime = marker.fileUrl?.replace("sent:", "");
         if (sentTime) {
           const sentDate = new Date(sentTime);
           if (now - sentDate > EXTENSION_IGNORE_HOURS * 60 * 60 * 1000) {
-            // Notify admin if not already notified (reuse marker type or add another if needed)
-            if (!marker.adminNotified) {
+            // Only notify admin once — check for a separate admin-notified marker
+            const prisma = require("../config/db");
+            const adminMarker = await prisma.document.findFirst({
+              where: { bookingId: Number(booking.id), documentType: "extension_admin_notified" },
+              select: { id: true },
+            });
+            if (!adminMarker) {
               await notifyAdminExtensionIgnored(booking);
-              // Optionally, update marker to prevent duplicate admin notifications
+              await prisma.document.create({
+                data: {
+                  bookingId: Number(booking.id),
+                  documentType: "extension_admin_notified",
+                  fileUrl: `sent:${new Date().toISOString()}`,
+                },
+              });
             }
           }
         }

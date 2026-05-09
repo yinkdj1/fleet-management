@@ -1,8 +1,8 @@
 // Trip Monitoring Agent
-// Handles pre-pickup alerts, midway check-ins, return reminders, and daily fleet reports.
+// Handles pre-pickup alerts, midway check-ins, return reminders, daily fleet reports,
+// overdue/late-return detection, and automatic pre-checkout prompts.
 // Uses Claude to write personalized SMS/email messages for each guest notification.
 // Deduplication uses the Prisma Document table so state survives server restarts.
-// Late-return/overdue logic is handled separately by tripMonitoringService.js.
 
 "use strict";
 
@@ -10,6 +10,13 @@ const Anthropic = require("@anthropic-ai/sdk");
 const prisma = require("../src/config/db");
 const { sendSMS } = require("../src/services/smsService");
 const { sendEmail: _sendEmail } = require("../src/services/emailService");
+const {
+  processAutomaticPrecheckoutPrompts,
+  getActiveTemplate,
+  renderSmsTemplate,
+  buildGuestManageLinks,
+} = require("../src/services/bookingService");
+const { monitorTrips } = require("../src/services/tripMonitoringService");
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@carsgidi.com";
 const WINDOW_MS = 10 * 60 * 1000; // 10-minute match window
@@ -22,6 +29,20 @@ function sendEmail(to, subject, text) {
 
 // --- LLM message generation ---
 // Calls Claude to write a short, personalized message. Falls back to a default if unavailable.
+
+/**
+ * Try to find a DB template body for anchor+channel, rendered with booking data.
+ * Returns null if no template is active, so caller can fall back to Claude/hardcoded.
+ */
+async function getTemplateBody(anchor, channel, booking, links) {
+  try {
+    const template = await getActiveTemplate(anchor, channel);
+    if (!template) return null;
+    return renderSmsTemplate(template.body, booking, links);
+  } catch {
+    return null;
+  }
+}
 
 async function generateMessage(event, context, fallback) {
   if (!process.env.ANTHROPIC_API_KEY) return fallback;
@@ -103,17 +124,23 @@ async function runTripNotifications() {
     const guestName = `${customer.firstName} ${customer.lastName}`;
     const msTillPickup = pickup - now;
 
+    // Build guest manage links (may fail if customer data incomplete)
+    let links = null;
+    try { links = buildGuestManageLinks(booking); } catch { /* skip */ }
+
     // Guest: pickup reminder (~10 min before)
     if (now < pickup && msTillPickup < WINDOW_MS) {
       await sendIfNew(id, "pickup-reminder", async () => {
         const ctx = { firstName: customer.firstName, vehicleLabel };
         if (customer.phone) {
-          const sms = await generateMessage("pickup-sms", ctx, `Hi ${customer.firstName}, it's almost time to pick up your ${vehicleLabel} at Carsgidi!`);
-          await sendSMS(customer.phone, sms);
+          const body = (await getTemplateBody("pickup", "sms", booking, links))
+            || (await generateMessage("pickup-sms", ctx, `Hi ${customer.firstName}, your ${vehicleLabel} pickup at Carsgidi is in a few minutes! We're ready for you.`));
+          await sendSMS(customer.phone, body);
         }
         if (customer.email) {
-          const body = await generateMessage("pickup-email", ctx, `Hi ${customer.firstName}, it's time to pick up your ${vehicleLabel}. Please check in at Carsgidi.`);
-          await sendEmail(customer.email, "Car Pickup Reminder", body);
+          const body = (await getTemplateBody("pickup", "email", booking, links))
+            || (await generateMessage("pickup-email", ctx, `Hi ${customer.firstName}, it's almost time to pick up your ${vehicleLabel} at Carsgidi! Please head over to check in your vehicle. We're excited to have you hit the road. If you have any questions, don't hesitate to reach out.`));
+          await sendEmail(customer.email, `${customer.firstName}, your ${vehicleLabel} is ready for pickup!`, body);
         }
       });
     }
@@ -130,12 +157,16 @@ async function runTripNotifications() {
       await sendIfNew(id, "midway-checkin", async () => {
         const ctx = { firstName: customer.firstName, vehicleLabel };
         if (customer.phone) {
-          const sms = await generateMessage("midway-sms", ctx, `Hi ${customer.firstName}, hope you're enjoying your ${vehicleLabel}! Need to extend? Visit carsgidi.com.`);
-          await sendSMS(customer.phone, sms);
+          const extendPart = links ? ` Need to extend? ${links.modifyUrl}` : " Need to extend? Visit carsgidi.com.";
+          const body = (await getTemplateBody("midpoint", "sms", booking, links))
+            || (await generateMessage("midway-sms", ctx, `Hi ${customer.firstName}, hope you're enjoying your ${vehicleLabel} rental!${extendPart}`));
+          await sendSMS(customer.phone, body);
         }
         if (customer.email) {
-          const body = await generateMessage("midway-email", ctx, `Hi ${customer.firstName}, hope your trip is going well! Need to extend your rental? Visit carsgidi.com.`);
-          await sendEmail(customer.email, "Trip Check-in", body);
+          const extendLink = links ? `<a href="${links.modifyUrl}">extend your rental here</a>` : "visit carsgidi.com to extend";
+          const body = (await getTemplateBody("midpoint", "email", booking, links))
+            || (await generateMessage("midway-email", ctx, `Hi ${customer.firstName}, we're checking in on your ${vehicleLabel} rental — hope everything is going great! If you'd like more time, you can ${extendLink}. We're here if you need anything.`));
+          await sendEmail(customer.email, `${customer.firstName}, how's your ${vehicleLabel} trip going?`, body);
         }
       });
     }
@@ -145,12 +176,14 @@ async function runTripNotifications() {
       await sendIfNew(id, "dropoff-reminder", async () => {
         const ctx = { firstName: customer.firstName, vehicleLabel };
         if (customer.phone) {
-          const sms = await generateMessage("dropoff-sms", ctx, `Hi ${customer.firstName}, please return your ${vehicleLabel} to Carsgidi shortly. Thank you!`);
-          await sendSMS(customer.phone, sms);
+          const body = (await getTemplateBody("return", "sms", booking, links))
+            || (await generateMessage("dropoff-sms", ctx, `Hi ${customer.firstName}, it's almost time to return your ${vehicleLabel} to Carsgidi. Thank you for choosing us — see you soon!`));
+          await sendSMS(customer.phone, body);
         }
         if (customer.email) {
-          const body = await generateMessage("dropoff-email", ctx, `Hi ${customer.firstName}, please return your ${vehicleLabel} shortly. Thank you for choosing Carsgidi!`);
-          await sendEmail(customer.email, "Return Reminder", body);
+          const body = (await getTemplateBody("return", "email", booking, links))
+            || (await generateMessage("dropoff-email", ctx, `Hi ${customer.firstName}, just a heads up that your ${vehicleLabel} rental is ending soon. Please return the vehicle to Carsgidi at your scheduled drop-off time. Thank you so much for choosing us — we hope you had a wonderful trip!`));
+          await sendEmail(customer.email, `${customer.firstName}, thank you for renting with Carsgidi!`, body);
         }
       });
     }
@@ -220,10 +253,40 @@ async function sendDailyFleetReport() {
   console.log(`[TripMonitor] Daily report sent: ${pickups.length} pickups, ${returns.length} returns`);
 }
 
+// --- Overdue / late return monitoring ---
+
+async function runOverdueCheck() {
+  try {
+    const alerts = await monitorTrips();
+    if (alerts.length > 0) {
+      console.log(`[TripMonitor] Overdue alerts: ${alerts.map((a) => `#${a.bookingId}(${a.type})`).join(", ")}`);
+    }
+  } catch (err) {
+    console.error("[TripMonitor] Overdue check error:", err.message);
+  }
+}
+
+// --- Precheckout prompt runner ---
+// Delegates to bookingService which handles deduplication and the 24hr window.
+// Running every 5 min (vs the server scheduler's 15 min) catches same-day bookings quickly.
+
+async function runPrecheckoutCheck() {
+  try {
+    const summary = await processAutomaticPrecheckoutPrompts();
+    if (summary.scanned > 0) {
+      console.log(`[TripMonitor] Precheckout: scanned=${summary.scanned}, sent=${summary.sent}, skipped=${summary.skipped}`);
+    }
+  } catch (err) {
+    console.error("[TripMonitor] Precheckout check error:", err.message);
+  }
+}
+
 // --- Main runner ---
 
 async function runAgent() {
   await runTripNotifications();
+  await runOverdueCheck();
+  await runPrecheckoutCheck();
 
   // Send daily fleet report once per day at or after 7am
   const now = new Date();

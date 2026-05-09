@@ -20,26 +20,7 @@ const AUTO_PRECHECKOUT_INTERVAL_MS =
 
 
 function startNotificationSchedulers() {
-  if (!AUTO_PRECHECKOUT_ENABLED) {
-    console.log("Automatic pre-checkout scheduler disabled.");
-    return;
-  }
-
-  // Pre-checkout job
-  const runPrecheckout = async () => {
-    try {
-      const summary = await bookingService.processAutomaticPrecheckoutPrompts();
-      if (summary.scanned > 0) {
-        console.log(
-          `Pre-checkout auto job: scanned=${summary.scanned}, sent=${summary.sent}, skipped=${summary.skipped}`
-        );
-      }
-    } catch (error) {
-      console.error("Pre-checkout auto job failed:", error.message || error);
-    }
-  };
-
-  // Booking notification job
+  // Booking notification job (pre-checkout is handled by tripMonitoringAgent every 5 min)
   const runBookingNotifs = async () => {
     try {
       await bookingService.processBookingNotifications();
@@ -48,9 +29,7 @@ function startNotificationSchedulers() {
     }
   };
 
-  runPrecheckout();
   runBookingNotifs();
-  setInterval(runPrecheckout, AUTO_PRECHECKOUT_INTERVAL_MS);
   setInterval(runBookingNotifs, AUTO_PRECHECKOUT_INTERVAL_MS);
   console.log(
     `Notification schedulers started (${AUTO_PRECHECKOUT_INTERVAL_MS / 60000} min interval).`

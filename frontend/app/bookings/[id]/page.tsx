@@ -138,6 +138,9 @@ export default function BookingDetailPage() {
   const precheckoutSelfieDocs =
     booking?.documents?.filter((doc) => doc.documentType === "precheckout_selfie_with_license") || [];
 
+  const stripeIdentityVerified =
+    booking?.documents?.some((doc) => doc.documentType === "stripe_identity_verified") || false;
+
   const sendPrecheckoutLink = async () => {
     setPrecheckoutMessage("");
     setPrecheckoutLink("");
@@ -465,7 +468,24 @@ export default function BookingDetailPage() {
           </div>
 
           <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Pre-checkout Verification</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Pre-checkout Verification</h2>
+              {stripeIdentityVerified ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Stripe Identity Verified
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-sm font-semibold text-zinc-500">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Identity Not Verified
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <p className="font-semibold mb-3">License Upload</p>

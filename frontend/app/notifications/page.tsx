@@ -5,7 +5,7 @@ import AppShell from "../components/AppShell";
 import api from "../../lib/api";
 
 type NotificationChannel = "email" | "sms";
-type NotificationAnchor = "booking_created" | "pickup" | "return" | "midpoint";
+type NotificationAnchor = "booking_created" | "pickup" | "return" | "midpoint" | "precheckout" | "overdue";
 type NotificationTiming = "before" | "after" | "exact";
 type OffsetUnit = "minutes" | "hours" | "days";
 
@@ -83,6 +83,8 @@ function formatAnchorLabel(anchor: NotificationAnchor) {
   if (anchor === "booking_created") return "booking creation";
   if (anchor === "pickup") return "pickup";
   if (anchor === "return") return "drop-off";
+  if (anchor === "precheckout") return "precheckout prompt";
+  if (anchor === "overdue") return "overdue / late return";
   return "midway during reservation";
 }
 
@@ -140,7 +142,7 @@ export default function NotificationsPage() {
   const fetchTemplates = async () => {
     try {
       setError("");
-      const res = await api.get("/notifications/templates");
+      const res = await api.get("/notifications");
       setTemplates(res.data?.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load notification templates");
@@ -206,7 +208,7 @@ export default function NotificationsPage() {
     try {
       setError("");
       setSuccess("");
-      await api.delete(`/notifications/templates/${templateId}`);
+      await api.delete(`/notifications/${templateId}`);
       setTemplates((prev) => prev.filter((template) => template.id !== templateId));
       if (editingId === templateId) {
         resetForm();
@@ -236,12 +238,12 @@ export default function NotificationsPage() {
 
     try {
       if (editingId) {
-        const res = await api.put(`/notifications/templates/${editingId}`, payload);
+        const res = await api.put(`/notifications/${editingId}`, payload);
         const updated = res.data?.data as NotificationTemplate;
         setTemplates((prev) => prev.map((template) => (template.id === editingId ? updated : template)));
         setSuccess("Notification template updated.");
       } else {
-        const res = await api.post("/notifications/templates", payload);
+        const res = await api.post("/notifications", payload);
         const created = res.data?.data as NotificationTemplate;
         setTemplates((prev) => [created, ...prev]);
         setSuccess("Notification template created.");
@@ -357,6 +359,8 @@ export default function NotificationsPage() {
                     <option value="pickup">Pickup</option>
                     <option value="return">Drop-off</option>
                     <option value="midpoint">Midway During Reservation</option>
+                    <option value="precheckout">Precheckout Prompt</option>
+                    <option value="overdue">Overdue / Late Return</option>
                   </select>
                 </div>
 
@@ -429,7 +433,7 @@ export default function NotificationsPage() {
                   required
                 />
                 <p className="mt-2 text-xs text-zinc-500">
-                  You can include placeholders like {"{{firstName}}"}, {"{{bookingId}}"}, {"{{pickupDatetime}}"}, {"{{returnDatetime}}"}, and {"{{vehicleName}}"}.
+                  Available placeholders: {"{{firstName}}"}, {"{{lastName}}"}, {"{{bookingId}}"}, {"{{vehicle}}"}, {"{{plateNumber}}"}, {"{{pickup}}"}, {"{{return}}"}, {"{{pickupLocation}}"}, {"{{total}}"}, {"{{manageUrl}}"}, {"{{modifyUrl}}"}, {"{{cancelUrl}}"}, {"{{supportPhone}}"}.
                 </p>
               </div>
 
