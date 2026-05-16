@@ -5,7 +5,7 @@ import AppShell from "../components/AppShell";
 import api from "../../lib/api";
 
 type NotificationChannel = "email" | "sms";
-type NotificationAnchor = "booking_created" | "pickup" | "return" | "midpoint" | "precheckout" | "overdue";
+type NotificationAnchor = "booking_created" | "pickup" | "return" | "midpoint" | "precheckout" | "overdue" | "late_return" | "late_fee_charge";
 type NotificationTiming = "before" | "after" | "exact";
 type OffsetUnit = "minutes" | "hours" | "days";
 
@@ -85,6 +85,8 @@ function formatAnchorLabel(anchor: NotificationAnchor) {
   if (anchor === "return") return "drop-off";
   if (anchor === "precheckout") return "precheckout prompt";
   if (anchor === "overdue") return "overdue / late return";
+  if (anchor === "late_return") return "late return detected";
+  if (anchor === "late_fee_charge") return "late fee charged";
   return "midway during reservation";
 }
 
@@ -355,12 +357,14 @@ export default function NotificationsPage() {
                     onChange={handleChange}
                     className="w-full rounded-xl border border-amber-900/15 bg-white px-3 py-2.5 text-zinc-900"
                   >
-                    <option value="booking_created">Booking Created</option>
-                    <option value="pickup">Pickup</option>
-                    <option value="return">Drop-off</option>
-                    <option value="midpoint">Midway During Reservation</option>
-                    <option value="precheckout">Precheckout Prompt</option>
-                    <option value="overdue">Overdue / Late Return</option>
+                    <option value="booking_created">Booking Created - Sent immediately after booking</option>
+                    <option value="pickup">Pickup - Sent at vehicle pickup time</option>
+                    <option value="return">Drop-off - Sent at vehicle return time</option>
+                    <option value="midpoint">Midway - Sent halfway through rental period</option>
+                    <option value="precheckout">Precheckout - Sent 24hrs before pickup</option>
+                    <option value="overdue">Overdue - Sent when return is overdue</option>
+                    <option value="late_return">Late Return - Sent when late return detected</option>
+                    <option value="late_fee_charge">Late Fee - Sent when late fee is charged</option>
                   </select>
                 </div>
 
@@ -432,9 +436,26 @@ export default function NotificationsPage() {
                   className="min-h-40 w-full rounded-xl border border-amber-900/15 bg-white px-3 py-2.5 text-zinc-900"
                   required
                 />
-                <p className="mt-2 text-xs text-zinc-500">
-                  Available placeholders: {"{{firstName}}"}, {"{{lastName}}"}, {"{{bookingId}}"}, {"{{vehicle}}"}, {"{{plateNumber}}"}, {"{{pickup}}"}, {"{{return}}"}, {"{{pickupLocation}}"}, {"{{total}}"}, {"{{manageUrl}}"}, {"{{modifyUrl}}"}, {"{{cancelUrl}}"}, {"{{supportPhone}}"}.
-                </p>
+                <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+                  <p className="text-xs font-semibold text-blue-900 mb-2">Available Variables:</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-800">
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{firstName}}"}</code> - Customer first name</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{lastName}}"}</code> - Customer last name</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{bookingId}}"}</code> - Booking ID number</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{vehicleLabel}}"}</code> - Vehicle make/model</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{plateNumber}}"}</code> - License plate</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{pickupDatetime}}"}</code> - Pickup date/time</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{returnDatetime}}"}</code> - Return date/time</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{pickupLocation}}"}</code> - Pickup location</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{totalAmount}}"}</code> - Total booking cost</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{manageUrl}}"}</code> - Manage booking link</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{modifyUrl}}"}</code> - Modify booking link</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{cancelUrl}}"}</code> - Cancel booking link</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{supportPhone}}"}</code> - Support phone number</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{lateFeeAmount}}"}</code> - Late fee amount (if applicable)</div>
+                    <div><code className="bg-blue-100 px-1 py-0.5 rounded">{"{{hoursOverdue}}"}</code> - Hours overdue (if applicable)</div>
+                  </div>
+                </div>
               </div>
 
               <div className="rounded-xl border border-amber-900/10 bg-amber-50/70 px-4 py-3 text-sm text-zinc-700">
