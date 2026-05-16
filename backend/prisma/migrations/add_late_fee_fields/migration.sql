@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Booking" ADD COLUMN     "lateFeeCharged" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "lateFeeAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "lateFeeSkipped" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "extraDayFeeCharged" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "extraDayFeeAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;

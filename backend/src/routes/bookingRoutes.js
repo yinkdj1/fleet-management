@@ -14,6 +14,12 @@ const {
   createGuestPrecheckoutLink,
 } = require("../controllers/bookingController");
 
+const {
+  chargeLateFee,
+  skipLateFee,
+  chargeExtraDayFee,
+} = require("../controllers/lateFeeController");
+
 const { protect } = require("../middleware/authMiddleware");
 
 // list + detail
@@ -32,5 +38,10 @@ router.post("/:id/precheckout-link", protect, createGuestPrecheckoutLink);
 // ✅ photo upload routes
 router.post("/:id/checkout", protect, upload.array("photos", 20), checkoutBooking);
 router.post("/:id/checkin", protect, upload.array("photos", 20), checkinBooking);
+
+// Late fee management
+router.post("/:id/charge-late-fee", protect, chargeLateFee);
+router.post("/:id/skip-late-fee", protect, skipLateFee);
+router.post("/:id/charge-extra-day-fee", protect, chargeExtraDayFee);
 
 module.exports = router;

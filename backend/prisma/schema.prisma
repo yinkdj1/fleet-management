@@ -83,6 +83,11 @@ model Booking {
   deposit            Float     @default(0)
   totalAmount        Float     @default(0)
   paymentStatus      String    @default("unpaid")
+  lateFeeCharged     Boolean   @default(false)
+  lateFeeAmount      Float     @default(0)
+  lateFeeSkipped     Boolean   @default(false)
+  extraDayFeeCharged Boolean   @default(false)
+  extraDayFeeAmount  Float     @default(0)
   customer           Customer  @relation(fields: [customerId], references: [id])
   vehicle            Vehicle   @relation(fields: [vehicleId], references: [id])
   checkout           Checkout?

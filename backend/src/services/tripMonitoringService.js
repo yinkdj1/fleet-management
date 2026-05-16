@@ -51,10 +51,34 @@ async function monitorTrips() {
   for (const booking of bookings) {
     const isLate = booking.status === "active" && new Date(booking.returnDatetime) < now;
     if (isLate) {
+      const hoursOverdue = (now - new Date(booking.returnDatetime)) / (1000 * 60 * 60);
+      
+      // Determine late fee status
+      let lateFeeStatus = null;
+      let extraDayFeeStatus = null;
+      
+      if (hoursOverdue >= 2 && !booking.lateFeeCharged && !booking.lateFeeSkipped) {
+        lateFeeStatus = "eligible"; // Can charge $20 late fee
+      } else if (booking.lateFeeCharged) {
+        lateFeeStatus = "charged";
+      } else if (booking.lateFeeSkipped) {
+        lateFeeStatus = "skipped";
+      }
+      
+      if (hoursOverdue >= 6 && !booking.extraDayFeeCharged) {
+        extraDayFeeStatus = "eligible"; // Can charge extra day fee
+      } else if (booking.extraDayFeeCharged) {
+        extraDayFeeStatus = "charged";
+      }
+      
       alerts.push({
         bookingId: booking.id,
         type: "overdue",
         message: `Booking ${booking.id} is overdue for return.`,
+        hoursOverdue: Math.floor(hoursOverdue),
+        lateFeeStatus,
+        extraDayFeeStatus,
+        booking, // Include full booking data for frontend
       });
 
       // Smart extension offer logic
