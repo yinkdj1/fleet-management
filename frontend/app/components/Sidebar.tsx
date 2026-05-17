@@ -12,6 +12,7 @@ const links = [
   { href: "/maintenance", label: "Maintenance" },
   { href: "/monitoring", label: "Monitoring" },
   { href: "/notifications", label: "Notifications" },
+  { href: "/admin/pricing", label: "Pricing" },
   { href: "/reports", label: "Reports" },
   { href: "/admin/users", label: "Staff Accounts" },
   { href: "/settings", label: "Settings" },
