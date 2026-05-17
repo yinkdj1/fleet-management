@@ -85,8 +85,9 @@ export default function PricingManagementPage() {
         api.get("/vehicles"),
         api.get("/pricing/rules"),
       ]);
-      setVehicles(vehiclesRes.data);
-      setRules(rulesRes.data);
+      // Handle different response formats
+      setVehicles(vehiclesRes.data?.data || vehiclesRes.data || []);
+      setRules(rulesRes.data?.data || rulesRes.data || []);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load data");
     } finally {
