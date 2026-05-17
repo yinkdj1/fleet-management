@@ -254,8 +254,8 @@ export default function CheckinPage() {
     <AppShell>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Vehicle Check-In</h1>
-          <p className="mt-1 text-gray-500">Record mileage, fuel, photos, damage, and any fees during vehicle check-in.</p>
+          <h1 className="text-3xl font-bold">Vehicle Pick-Up (Check-In)</h1>
+          <p className="mt-1 text-gray-500">Record initial mileage, fuel, and vehicle condition before customer drives away.</p>
         </div>
         <Link href="/bookings" className="rounded bg-zinc-800 px-4 py-2 text-sm text-white">
           ← Back to Bookings

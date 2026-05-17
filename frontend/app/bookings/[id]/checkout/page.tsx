@@ -241,8 +241,8 @@ export default function CheckoutPage() {
     <AppShell>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Vehicle Drop-Off</h1>
-          <p className="mt-1 text-gray-500">Record mileage, fuel, photos, and any damage before handing off the vehicle.</p>
+          <h1 className="text-3xl font-bold">Vehicle Return (Check-Out)</h1>
+          <p className="mt-1 text-gray-500">Record final mileage, fuel, condition, and assess any damage or fees after customer returns vehicle.</p>
         </div>
         <Link href="/bookings" className="rounded bg-zinc-800 px-4 py-2 text-sm text-white">
           ← Back to Bookings
@@ -327,8 +327,8 @@ export default function CheckoutPage() {
 
         {/* Section 3 — Photos */}
         <section className="rounded-xl border bg-white p-5 shadow-sm">
-          <h2 className="mb-1 text-lg font-semibold">Drop-Off Photos</h2>
-          <p className="mb-4 text-sm text-gray-500">Upload photos of all sides of the vehicle and any damage before the guest drives away.</p>
+          <h2 className="mb-1 text-lg font-semibold">Return Photos</h2>
+          <p className="mb-4 text-sm text-gray-500">Upload photos of all sides of the vehicle and any damage after customer returns it.</p>
           
           <div className="flex gap-3 mb-4">
             <label className="flex-1 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-4 py-5 text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600">
