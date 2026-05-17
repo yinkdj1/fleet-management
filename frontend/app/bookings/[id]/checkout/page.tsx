@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import api from "../../../../lib/api";import { formatBookingId } from "../../../../lib/bookingId";import AppShell from "../../../components/AppShell";
+import api from "../../../../lib/api";
+import { formatBookingId } from "../../../../lib/bookingId";
+import AppShell from "../../../components/AppShell";
+import CameraCapture from "../../../components/CameraCapture";
 
 type BookingSummary = {
   id: number;
@@ -170,6 +173,7 @@ export default function CheckoutPage() {
   const [damageMarkers, setDamageMarkers] = useState<DamageMarker[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showCamera, setShowCamera] = useState(false);
 
   useEffect(() => {
     api.get(`/bookings/${bookingId}`)
@@ -190,6 +194,14 @@ export default function CheckoutPage() {
   const removePhoto = (index: number) => {
     setPhotos((prev) => {
       const next = prev.filter((_, i) => i !== index);
+      setPreviewUrls(next.map((f) => URL.createObjectURL(f)));
+      return next;
+    });
+  };
+
+  const handleCameraCapture = (file: File) => {
+    setPhotos((prev) => {
+      const next = [...prev, file];
       setPreviewUrls(next.map((f) => URL.createObjectURL(f)));
       return next;
     });
@@ -317,13 +329,28 @@ export default function CheckoutPage() {
         <section className="rounded-xl border bg-white p-5 shadow-sm">
           <h2 className="mb-1 text-lg font-semibold">Drop-Off Photos</h2>
           <p className="mb-4 text-sm text-gray-500">Upload photos of all sides of the vehicle and any damage before the guest drives away.</p>
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-4 py-5 text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600">
-            <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden="true">
-              <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 12V4m0 0-3 3m3-3 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Click to add photos (multiple allowed)
-            <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotosChange} />
-          </label>
+          
+          <div className="flex gap-3 mb-4">
+            <label className="flex-1 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-4 py-5 text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600">
+              <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden="true">
+                <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 12V4m0 0-3 3m3-3 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Upload Photos
+              <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotosChange} />
+            </label>
+            
+            <button
+              type="button"
+              onClick={() => setShowCamera(true)}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-blue-300 px-4 py-5 text-sm text-blue-600 hover:border-blue-400 hover:bg-blue-50"
+            >
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Take Photo
+            </button>
+          </div>
           {previewUrls.length > 0 && (
             <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
               {previewUrls.map((url, i) => (
@@ -356,6 +383,14 @@ export default function CheckoutPage() {
           <Link href="/bookings" className="text-sm text-gray-500 underline">Cancel</Link>
         </div>
       </form>
+
+      {/* Camera Modal */}
+      {showCamera && (
+        <CameraCapture
+          onCapture={handleCameraCapture}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
     </AppShell>
   );
 }
