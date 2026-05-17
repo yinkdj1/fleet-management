@@ -378,7 +378,7 @@ export default function CheckoutPage() {
             disabled={submitting}
             className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-60"
           >
-            {submitting ? "Submitting Drop-Off…" : "Confirm Drop-Off & Activate Booking"}
+            {submitting ? "Completing Return…" : "Complete Check-Out & End Trip"}
           </button>
           <Link href="/bookings" className="text-sm text-gray-500 underline">Cancel</Link>
         </div>

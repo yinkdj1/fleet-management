@@ -455,7 +455,7 @@ export default function CheckinPage() {
             disabled={submitting}
             className="rounded-xl bg-green-600 px-6 py-3 font-semibold text-white shadow hover:bg-green-700 disabled:opacity-60"
           >
-            {submitting ? "Submitting Return…" : "Complete Checkin"}
+            {submitting ? "Starting Trip…" : "Complete Check-In & Start Trip"}
           </button>
           <Link href="/bookings" className="text-sm text-gray-500 underline">Cancel</Link>
         </div>
