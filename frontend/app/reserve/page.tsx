@@ -1592,8 +1592,8 @@ export default function ReservePage() {
                     alt="Carsgidi hero"
                     width={1307}
                     height={871}
-                    className="h-full w-full object-contain"
-                    style={{ objectPosition: "left top" }}
+                    className="h-full w-full object-cover"
+                    style={{ objectPosition: "center" }}
                   />
                 </div>
                 <div className="relative h-full flex flex-col justify-end">
