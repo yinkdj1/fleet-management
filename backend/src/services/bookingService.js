@@ -2392,7 +2392,7 @@ async function checkinBooking(id, data, photos = []) {
   const updatedBooking = await prisma.booking.update({
     where: { id: Number(id) },
     data: {
-      status: "completed",
+      status: "active",
     },
     include: {
       customer: true,
