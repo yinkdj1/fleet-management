@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  url      = env("DATABASE_URL")
 }
 
 datasource db {
@@ -44,10 +43,18 @@ model Vehicle {
   color              String?
   mileage            Int                  @default(0)
   dailyRate          Float
+  pricingType        String               @default("flat")
+  hourlyRate         Float?
+  weeklyRate         Float?
+  monthlyRate        Float?
+  peakMultiplier     Float                @default(1.0)
+  offPeakMultiplier  Float                @default(1.0)
+  weekendMultiplier  Float                @default(1.0)
   status             String               @default("available")
   bookings           Booking[]
   maintenanceRecords MaintenanceRecord[]
   usageSettings      VehicleUsageSettings?
+  pricingRules       PricingRule[]
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 }
@@ -200,4 +207,22 @@ model NotificationTemplate {
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model PricingRule {
+  id          Int       @id @default(autoincrement())
+  vehicleId   Int?
+  ruleType    String    // "peak_hours", "weekend", "holiday", "demand", "seasonal"
+  multiplier  Float     @default(1.0)
+  startDate   DateTime?
+  endDate     DateTime?
+  daysOfWeek  String?   // JSON array: ["saturday", "sunday"]
+  startTime   String?   // "18:00"
+  endTime     String?   // "22:00"
+  isActive    Boolean   @default(true)
+  priority    Int       @default(0)
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  vehicle     Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }

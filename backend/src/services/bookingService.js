@@ -205,6 +205,7 @@ const {
 const { hasSmtpConfig, sendEmail } = require("./emailService");
 const { getDiscountSettings } = require("./discountSettingsService");
 const { listNotificationTemplates } = require("./notificationTemplateService");
+const { calculateDynamicPrice } = require("./dynamicPricingService");
 const twilio = require("twilio");
 
 const PRECHECKOUT_AUTO_MARKER_TYPE = "precheckout_prompt_auto_sent";
@@ -485,7 +486,20 @@ function getBookingTaxPercentage(settings) {
 
 async function calculateBookingAmounts({ pickupDatetime, returnDatetime, vehicle }) {
   const days = calculateRentalDays(pickupDatetime, returnDatetime);
-  const dailyRate = getVehicleDailyRate(vehicle);
+  
+  // Use dynamic pricing if enabled, otherwise use flat rate
+  let dailyRate;
+  if (vehicle.pricingType === "dynamic") {
+    try {
+      dailyRate = await calculateDynamicPrice(vehicle.id, pickupDatetime, returnDatetime);
+    } catch (error) {
+      console.error("Dynamic pricing calculation failed, falling back to flat rate:", error);
+      dailyRate = getVehicleDailyRate(vehicle);
+    }
+  } else {
+    dailyRate = getVehicleDailyRate(vehicle);
+  }
+  
   const settings = await getDiscountSettings();
   const discount = await getBookingDiscountForDays(days, settings);
 
@@ -1329,20 +1343,27 @@ async function createPublicReservation(data) {
     paymentStatus: "paid",
   });
 
-  const confirmation = await sendReservationConfirmationEmail(booking);
-  const confirmationSms = await sendReservationConfirmationSms(booking);
+  // Send notifications asynchronously without blocking the response
+  Promise.all([
+    sendReservationConfirmationEmail(booking).catch(err => 
+      console.error('Failed to send confirmation email:', err)
+    ),
+    sendReservationConfirmationSms(booking).catch(err => 
+      console.error('Failed to send confirmation SMS:', err)
+    )
+  ]);
 
   return {
     ...booking,
     confirmationEmail: {
-      sent: confirmation.sent,
-      message: confirmation.message,
-      links: confirmation.links,
+      sent: false,
+      message: "Confirmation email is being sent in the background.",
+      links: null,
     },
     confirmationSms: {
-      sent: confirmationSms.sent,
-      message: confirmationSms.message,
-      links: confirmationSms.links,
+      sent: false,
+      message: "Confirmation SMS is being sent in the background.",
+      links: null,
     },
   };
 }

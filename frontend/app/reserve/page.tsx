@@ -1613,6 +1613,7 @@ export default function ReservePage() {
                         name="pickupDatetime"
                         value={form.pickupDatetime}
                         onChange={handleChange}
+                        min={new Date().toISOString().slice(0, 16)}
                         className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1.5 text-xs text-zinc-900 shadow-sm md:p-2 md:text-sm"
                         required
                       />

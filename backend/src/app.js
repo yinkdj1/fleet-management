@@ -15,6 +15,7 @@ const aiRoutes = require("./routes/aiRoutes");
 const couponRoutes = require("./routes/couponRoutes");
 const tripMonitoringRoutes = require("./routes/tripMonitoringRoutes");
 const webhookRoutes = require("./routes/webhookRoutes");
+const pricingRoutes = require("./routes/pricingRoutes");
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/monitor", tripMonitoringRoutes);
 app.use("/api/webhooks", webhookRoutes);
+app.use("/api/pricing", pricingRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/public", publicRoutes);
 
