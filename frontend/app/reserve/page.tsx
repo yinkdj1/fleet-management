@@ -1585,7 +1585,7 @@ export default function ReservePage() {
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
-              <aside className="relative mx-auto aspect-[3/1] w-full max-w-[1307px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.2)] ring-1 ring-slate-200/60 reserve-surface-lift min-h-[180px] sm:min-h-[300px] md:min-h-[360px]">
+              <aside className="relative mx-auto aspect-[3/1] w-full max-w-[980px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.2)] ring-1 ring-slate-200/60 reserve-surface-lift min-h-[135px] sm:min-h-[225px] md:min-h-[270px]">
                 <div className="absolute inset-0">
                   <img
                     src="/Newhero.png"
