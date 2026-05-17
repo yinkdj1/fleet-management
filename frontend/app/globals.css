@@ -26,7 +26,7 @@ body {
 
 /* Shared input/select/textarea hover + focus styles */
 .form-input-modern {
-  border: 1.5px solid #e2e8f0;
+  border: 2px solid #cbd5e1;
   background: #ffffff;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   outline: none;
@@ -58,7 +58,7 @@ body {
 
 .night-mode-section .form-input-modern {
   background: #1e293b !important; /* slate-800 */
-  border-color: #475569 !important; /* slate-600 */
+  border: 2px solid #64748b !important; /* slate-500 - darker/bolder */
   color: #f1f5f9 !important; /* slate-100 */
 }
 
