@@ -377,7 +377,12 @@ export default function PricingManagementPage() {
 
         {/* Vehicle Pricing Modal */}
         {showVehicleModal && selectedVehicle && (
-          <div className="fixed inset-0 left-64 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 left-64 flex items-center justify-center z-50 p-4" style={{
+            backgroundImage: 'url(/Newhero.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}>
+            <div className="absolute inset-0 bg-black bg-opacity-40 backdrop-blur-sm"></div>
             <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="text-xl font-semibold">
@@ -522,7 +527,12 @@ export default function PricingManagementPage() {
 
         {/* Pricing Rule Modal */}
         {showRuleModal && (
-          <div className="fixed inset-0 left-64 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 left-64 flex items-center justify-center z-50 p-4" style={{
+            backgroundImage: 'url(/Newhero.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}>
+            <div className="absolute inset-0 bg-black bg-opacity-40 backdrop-blur-sm"></div>
             <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="text-xl font-semibold">
