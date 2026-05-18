@@ -2556,18 +2556,18 @@ export default function ReservePage() {
                     disabled={
                       submitting ||
                       loadingVehicles ||
-                      !form.paymentConfirmed ||
                       !allTermsAccepted ||
                       !form.vehicleId ||
                       !selectedVehicle ||
                       !form.pickupDatetime ||
                       !form.returnDatetime ||
-                      !pricePreview
+                      !pricePreview ||
+                      !confirmPaymentRef.current
                     }
                     className="attention-bounce md:col-span-2 xl:col-span-4 w-full rounded-xl bg-[#2f66e8] px-4 py-3 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2257d6] disabled:opacity-60"
                   >
                     {submitting
-                      ? "Submitting Reservation..."
+                      ? "Processing Payment & Reservation..."
                       : "Confirm Reservation"}
                   </button>
                 </>
