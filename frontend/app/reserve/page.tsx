@@ -1362,12 +1362,6 @@ export default function ReservePage() {
       errors.vehicleId = "Selected vehicle not found. Please choose again.";
     if (form.pickupDatetime && form.returnDatetime && form.vehicleId && !pricePreview)
       errors.returnDatetime = "Could not calculate price. Check pickup and return dates.";
-    if (!form.paymentReference.trim()) {
-      errors.paymentReference = "Payment reference is required";
-    }
-    if (!form.paymentConfirmed) {
-      errors.paymentConfirmed = "Confirm payment before submitting";
-    }
     if (!allTermsAccepted) {
       errors.termsAccepted =
         "You must accept all rental terms before confirming reservation";
