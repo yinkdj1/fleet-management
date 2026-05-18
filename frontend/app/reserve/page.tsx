@@ -2133,7 +2133,7 @@ export default function ReservePage() {
                       name="firstName"
                       value={form.firstName}
                       onChange={handleChange}
-                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      className="w-full rounded-xl form-input-modern p-3"
                       required
                     />
                     {fieldErrors.firstName && (
@@ -2151,7 +2151,7 @@ export default function ReservePage() {
                       name="lastName"
                       value={form.lastName}
                       onChange={handleChange}
-                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      className="w-full rounded-xl form-input-modern p-3"
                       required
                     />
                     {fieldErrors.lastName && (
@@ -2175,7 +2175,7 @@ export default function ReservePage() {
                       value={form.email}
                       onChange={handleChange}
                       onBlur={handleContactBlur}
-                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      className="w-full rounded-xl form-input-modern p-3"
                       placeholder="you@example.com"
                       required
                     />
@@ -2196,7 +2196,7 @@ export default function ReservePage() {
                       value={form.dateOfBirth}
                       onChange={handleChange}
                       max={maxDateOfBirth || undefined}
-                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      className="w-full rounded-xl form-input-modern p-3"
                       required
                     />
                     {fieldErrors.dateOfBirth && (
@@ -2214,7 +2214,7 @@ export default function ReservePage() {
                       name="driversLicenseNo"
                       value={form.driversLicenseNo}
                       onChange={handleChange}
-                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      className="w-full rounded-xl form-input-modern p-3"
                       required
                     />
                     {fieldErrors.driversLicenseNo && (
@@ -2245,7 +2245,7 @@ export default function ReservePage() {
                       aria-autocomplete="list"
                       aria-expanded={showAddressSuggestions}
                       aria-controls="address-suggestions-list"
-                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      className="w-full rounded-xl form-input-modern p-3"
                       placeholder="123 Main Street"
                       required
                     />
@@ -2290,7 +2290,7 @@ export default function ReservePage() {
                       name="city"
                       value={form.city}
                       onChange={handleChange}
-                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      className="w-full rounded-xl form-input-modern p-3"
                       required
                     />
                     {fieldErrors.city && (
@@ -2308,7 +2308,7 @@ export default function ReservePage() {
                       name="state"
                       value={form.state}
                       onChange={handleChange}
-                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      className="w-full rounded-xl form-input-modern p-3"
                       required
                     >
                       <option value="">Select State</option>
@@ -2333,7 +2333,7 @@ export default function ReservePage() {
                       name="zip"
                       value={form.zip}
                       onChange={handleChange}
-                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      className="w-full rounded-xl form-input-modern p-3"
                       required
                     />
                     {fieldErrors.zip && (
@@ -2353,7 +2353,7 @@ export default function ReservePage() {
                       value={form.phone}
                       onChange={handleChange}
                       onBlur={handleContactBlur}
-                      className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
+                      className="w-full rounded-xl form-input-modern p-3"
                       placeholder="+1 555 123 4567"
                       required
                     />
