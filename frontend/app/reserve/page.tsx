@@ -618,6 +618,7 @@ export default function ReservePage() {
   const [pickupLocation, setPickupLocation] = useState("Main Office");
   const vehicleRequestIdRef = useRef(0);
   const addressRequestIdRef = useRef(0);
+  const confirmPaymentRef = useRef<(() => Promise<void>) | null>(null);
   const [maxDateOfBirth, setMaxDateOfBirth] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
@@ -1219,6 +1220,10 @@ export default function ReservePage() {
     }));
   };
 
+  const handlePaymentReady = (confirmPayment: () => Promise<void>) => {
+    confirmPaymentRef.current = confirmPayment;
+  };
+
   const handleSelectVehicle = (vehicleId: string) => {
     setForm((prev) => ({
       ...prev,
@@ -1412,6 +1417,16 @@ export default function ReservePage() {
       }));
       setError("Please fix the highlighted fields.");
       return;
+    }
+
+    // Trigger Stripe payment before submitting reservation
+    if (confirmPaymentRef.current) {
+      try {
+        await confirmPaymentRef.current();
+      } catch (paymentError) {
+        // Payment failed, error already handled by handleStripePaymentError
+        return;
+      }
     }
 
     try {
@@ -2383,6 +2398,7 @@ export default function ReservePage() {
                       amount={pricePreview?.total || 0}
                       onSuccess={handleStripePaymentSuccess}
                       onError={handleStripePaymentError}
+                      onPaymentReady={handlePaymentReady}
                       customerEmail={form.email}
                       customerName={`${form.firstName} ${form.lastName}`.trim()}
                       disabled={!pricePreview || !form.firstName || !form.lastName || !form.email}

@@ -20,24 +20,25 @@ type PaymentFormProps = {
   customerName?: string;
   bookingId?: number;
   disabled?: boolean;
+  onPaymentReady?: (confirmPayment: () => Promise<void>) => void;
 };
 
 type CheckoutFormProps = {
   amount: number;
   onSuccess: (paymentIntentId: string) => void;
   onError: (error: string) => void;
+  onPaymentReady?: (confirmPayment: () => Promise<void>) => void;
 };
 
-function CheckoutForm({ amount, onSuccess, onError }: CheckoutFormProps) {
+function CheckoutForm({ amount, onSuccess, onError, onPaymentReady }: CheckoutFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const confirmPayment = async () => {
     if (!stripe || !elements) {
+      onError("Payment system not ready");
       return;
     }
 
@@ -56,24 +57,34 @@ function CheckoutForm({ amount, onSuccess, onError }: CheckoutFormProps) {
       if (error) {
         onError(error.message || "Payment failed");
         setMessage(error.message || "Payment failed");
+        throw new Error(error.message || "Payment failed");
       } else if (paymentIntent && paymentIntent.status === "succeeded") {
         onSuccess(paymentIntent.id);
         setMessage("Payment successful!");
       } else {
         onError("Payment was not completed");
         setMessage("Payment was not completed");
+        throw new Error("Payment was not completed");
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
       onError(errorMessage);
       setMessage(errorMessage);
+      throw err;
     } finally {
       setProcessing(false);
     }
   };
 
+  // Expose confirmPayment function to parent
+  useEffect(() => {
+    if (stripe && elements && onPaymentReady) {
+      onPaymentReady(confirmPayment);
+    }
+  }, [stripe, elements, onPaymentReady]);
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="space-y-4">
       <PaymentElement />
       
       {message && (
@@ -82,14 +93,12 @@ function CheckoutForm({ amount, onSuccess, onError }: CheckoutFormProps) {
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={!stripe || processing}
-        className="attention-bounce w-full rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:-translate-y-0.5 disabled:opacity-60"
-      >
-        {processing ? "Processing..." : `Pay $${amount.toFixed(2)}`}
-      </button>
-    </form>
+      {processing && (
+        <div className="text-sm text-blue-600">
+          Processing payment...
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -101,6 +110,7 @@ export default function StripePaymentForm({
   customerName,
   bookingId,
   disabled = false,
+  onPaymentReady,
 }: PaymentFormProps) {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -235,7 +245,7 @@ export default function StripePaymentForm({
       </p>
       
       <Elements stripe={stripePromise} options={{ clientSecret, appearance }}>
-        <CheckoutForm amount={amount} onSuccess={onSuccess} onError={onError} />
+        <CheckoutForm amount={amount} onSuccess={onSuccess} onError={onError} onPaymentReady={onPaymentReady} />
       </Elements>
     </div>
   );
