@@ -2266,7 +2266,7 @@ export default function ReservePage() {
                               event.preventDefault();
                               handleAddressSuggestionSelect(suggestion);
                             }}
-                            className={`block w-full border-b border-slate-100 px-3 py-2 text-left text-sm text-zinc-700 last:border-b-0 hover:bg-slate-50 ${
+                            className={`block w-full border-b border-slate-100 px-3 py-2 text-left text-sm font-medium text-zinc-900 last:border-b-0 hover:bg-slate-50 ${
                               activeAddressSuggestionIndex === index ? "bg-slate-100" : ""
                             }`}
                           >
