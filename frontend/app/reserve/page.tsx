@@ -1597,7 +1597,7 @@ export default function ReservePage() {
                         {pickupLocation}
                       </p>
                     </div>
-                    <div className="mb-2 md:mb-0">
+                    <div className="mb-2 md:mb-0 rounded-xl bg-white/95 backdrop-blur-sm p-2 md:bg-transparent md:backdrop-blur-none md:p-0">
                       <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-900 md:text-sm md:text-zinc-700`}>Pickup date</label>
                       <input
                         type="datetime-local"
@@ -1612,7 +1612,7 @@ export default function ReservePage() {
                         <p className="mt-1 text-sm text-red-600">{fieldErrors.pickupDatetime}</p>
                       )}
                     </div>
-                    <div className="mb-2 md:mb-0">
+                    <div className="mb-2 md:mb-0 rounded-xl bg-white/95 backdrop-blur-sm p-2 md:bg-transparent md:backdrop-blur-none md:p-0">
                       <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-900 md:text-sm md:text-zinc-700`}>Return date</label>
                       <input
                         type="datetime-local"
@@ -1631,7 +1631,7 @@ export default function ReservePage() {
                         <p className="mt-1 text-sm text-red-600">{fieldErrors.returnDatetime}</p>
                       )}
                     </div>
-                    <div>
+                    <div className="rounded-xl bg-white/95 backdrop-blur-sm p-2 md:bg-transparent md:backdrop-blur-none md:p-0">
                       <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-900 md:hidden`}>Search cars</label>
                       <button
                         type="button"
