@@ -1598,7 +1598,7 @@ export default function ReservePage() {
                       </p>
                     </div>
                     <div className="mb-2 md:mb-0">
-                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-700 md:text-sm`}>Pickup date</label>
+                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-900 md:text-sm md:text-zinc-700`}>Pickup date</label>
                       <input
                         type="datetime-local"
                         name="pickupDatetime"
@@ -1613,7 +1613,7 @@ export default function ReservePage() {
                       )}
                     </div>
                     <div className="mb-2 md:mb-0">
-                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-700 md:text-sm`}>Return date</label>
+                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-900 md:text-sm md:text-zinc-700`}>Return date</label>
                       <input
                         type="datetime-local"
                         name="returnDatetime"
