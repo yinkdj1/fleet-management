@@ -9,6 +9,9 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 
+// Get API base URL from environment variable or default to /api
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
+
 type PaymentFormProps = {
   amount: number;
   onSuccess: (paymentIntentId: string) => void;
@@ -108,7 +111,7 @@ export default function StripePaymentForm({
     // Fetch payment config and initialize Stripe
     const initializeStripe = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/payments/config");
+        const response = await fetch(`${API_BASE_URL}/payments/config`);
         const data = await response.json();
 
         if (!data.success || !data.data.stripeConfigured) {
@@ -141,7 +144,7 @@ export default function StripePaymentForm({
     const createPaymentIntent = async () => {
       try {
         setLoading(true);
-        const response = await fetch("http://localhost:5000/api/payments/create-intent", {
+        const response = await fetch(`${API_BASE_URL}/payments/create-intent`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
