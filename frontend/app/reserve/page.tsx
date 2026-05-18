@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../lib/api";
 
 const ChatWidget = dynamic(() => import("../components/ChatWidget"), { ssr: false });
+const StripePaymentForm = dynamic(() => import("../components/StripePaymentForm"), { ssr: false });
 
 // Default discount tiers (empty by default)
 const DEFAULT_BOOKING_DISCOUNT_TIERS: { minDays: number; discountPercent: number }[] = [];
@@ -1190,51 +1191,32 @@ export default function ReservePage() {
     }
   };
 
-  const handleTestPayment = async () => {
-    setError("");
-    setPaymentMessage("");
+  const handleStripePaymentSuccess = (paymentIntentId: string) => {
+    setForm((prev) => ({
+      ...prev,
+      paymentReference: paymentIntentId,
+      paymentConfirmed: true,
+    }));
+    setPaymentMessage(`Payment confirmed. Reference: ${paymentIntentId}`);
     setFieldErrors((prev) => ({
       ...prev,
       paymentReference: "",
       paymentConfirmed: "",
       paymentStatus: "",
     }));
+  };
 
-    if (!pricePreview) {
-      setError("Select valid reservation dates and a vehicle before payment.");
-      return;
-    }
-
-    try {
-      setPaying(true);
-      const payload = {
-        status: "paid",
-        cardBrand: "demo",
-        last4: "0000",
-        paymentReference: `DUMMY-${Date.now()}`,
-      };
-
-      setForm((prev) => ({
-        ...prev,
-        paymentReference: payload.paymentReference || "",
-        paymentConfirmed: payload.status === "paid",
-      }));
-
-      setPaymentMessage(
-        payload.status === "paid"
-          ? `Demo payment confirmed (${payload.cardBrand?.toUpperCase()} ****${payload.last4}). Ref: ${payload.paymentReference}`
-          : "Payment not completed.",
-      );
-    } catch {
-      setError("Demo payment failed");
-      setForm((prev) => ({
-        ...prev,
-        paymentReference: "",
-        paymentConfirmed: false,
-      }));
-    } finally {
-      setPaying(false);
-    }
+  const handleStripePaymentError = (error: string) => {
+    setError(error);
+    setForm((prev) => ({
+      ...prev,
+      paymentReference: "",
+      paymentConfirmed: false,
+    }));
+    setFieldErrors((prev) => ({
+      ...prev,
+      paymentStatus: error,
+    }));
   };
 
   const handleSelectVehicle = (vehicleId: string) => {
@@ -1991,7 +1973,7 @@ export default function ReservePage() {
                                 "--anim-delay": `${index * 45}ms`,
                               } as React.CSSProperties
                             }
-                            className={`group relative w-full overflow-hidden rounded-2xl bg-white/95 text-left transition duration-200 ${
+                            className={`group relative w-full h-full overflow-hidden rounded-2xl bg-white/95 text-left transition duration-200 ${
                               isShowingAvailableCars ? "p-3" : "p-4"
                             } ${
                               isShowingAvailableCars
@@ -2011,7 +1993,7 @@ export default function ReservePage() {
                                   : "bg-transparent"
                               }`}
                             />
-                            <div className={`flex h-full flex-col ${isShowingAvailableCars ? "gap-2.5" : "gap-3.5"}`}>
+                            <div className={`flex h-full flex-col justify-between ${isShowingAvailableCars ? "gap-2.5" : "gap-3.5"}`}>
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <p className={`${displayFont.className} truncate font-semibold text-zinc-900 ${
@@ -2394,122 +2376,23 @@ export default function ReservePage() {
                   )}
 
                   <div
-                    className="md:col-span-2 xl:col-span-4 rounded-2xl border border-emerald-300/40 bg-emerald-500/12 p-4 space-y-3 animate-stagger"
+                    className="md:col-span-2 xl:col-span-4 animate-stagger"
                     style={{ "--anim-delay": "140ms" } as React.CSSProperties}
                   >
-                    <p className="text-sm font-semibold text-emerald-900">
-                      Credit Card Payment (Test Mode)
-                    </p>
-                    <p className="text-xs text-emerald-800">
-                      This is a dummy payment step for now. Clicking the button
-                      below marks payment as confirmed so reservation can be
-                      completed.
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                      <div className="md:col-span-2 xl:col-span-1">
-                        <label className="block mb-1 text-sm font-medium text-zinc-700">
-                          Cardholder Name
-                        </label>
-                        <input
-                          name="cardholderName"
-                          value={paymentForm.cardholderName}
-                          onChange={handlePaymentInputChange}
-                          className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                          placeholder="John Doe"
-                        />
-                        {fieldErrors.cardholderName && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {fieldErrors.cardholderName}
-                          </p>
-                        )}
-                      </div>
-                      <div className="md:col-span-2 xl:col-span-1">
-                        <label className="block mb-1 text-sm font-medium text-zinc-700">
-                          Card Number
-                        </label>
-                        <input
-                          name="cardNumber"
-                          value={paymentForm.cardNumber}
-                          onChange={handlePaymentInputChange}
-                          className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                          placeholder="4242 4242 4242 4242"
-                        />
-                      </div>
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-zinc-700">
-                          Expiry (MM/YY)
-                        </label>
-                        <input
-                          name="expiry"
-                          value={paymentForm.expiry}
-                          onChange={handlePaymentInputChange}
-                          className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                          placeholder="12/30"
-                        />
-                        {fieldErrors.expiry && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {fieldErrors.expiry}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block mb-1 text-sm font-medium text-zinc-700">
-                          CVV
-                        </label>
-                        <input
-                          name="cvv"
-                          value={paymentForm.cvv}
-                          onChange={handlePaymentInputChange}
-                          className="w-full rounded-xl form-input-modern p-3 text-zinc-900"
-                          placeholder="123"
-                        />
-                        {fieldErrors.cvv && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {fieldErrors.cvv}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {fieldErrors.paymentStatus && (
-                      <p className="text-sm text-red-600">
-                        {fieldErrors.paymentStatus}
-                      </p>
-                    )}
-                    {fieldErrors.paymentReference && (
-                      <p className="text-sm text-red-600">
-                        {fieldErrors.paymentReference}
-                      </p>
-                    )}
-                    {fieldErrors.paymentConfirmed && (
-                      <p className="text-sm text-red-600">
-                        {fieldErrors.paymentConfirmed}
-                      </p>
-                    )}
+                    <StripePaymentForm
+                      amount={pricePreview?.total || 0}
+                      onSuccess={handleStripePaymentSuccess}
+                      onError={handleStripePaymentError}
+                      customerEmail={form.email}
+                      customerName={`${form.firstName} ${form.lastName}`.trim()}
+                      disabled={!pricePreview || !form.firstName || !form.lastName || !form.email}
+                    />
 
                     {paymentMessage && (
-                      <p className="text-sm text-emerald-900">
+                      <p className="mt-2 text-sm text-emerald-900">
                         {paymentMessage}
                       </p>
                     )}
-
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleTestPayment}
-                        disabled={paying || !pricePreview}
-                        className="attention-bounce w-full sm:w-auto rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:-translate-y-0.5 disabled:opacity-60"
-                      >
-                        {paying
-                          ? "Confirming Demo Payment..."
-                          : "Confirm Demo Payment"}
-                      </button>
-                      {form.paymentConfirmed && (
-                        <span className="text-sm font-semibold text-emerald-900">
-                          Payment Confirmed
-                        </span>
-                      )}
-                    </div>
                   </div>
 
                   <div
