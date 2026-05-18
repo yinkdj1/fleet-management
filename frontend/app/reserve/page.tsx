@@ -1576,8 +1576,8 @@ export default function ReservePage() {
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
-              <aside className="relative mx-auto aspect-[3/1] w-full max-w-[980px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.2)] ring-1 ring-slate-200/60 reserve-surface-lift min-h-[135px] sm:min-h-[225px] md:min-h-[270px]">
-                <div className="absolute inset-0">
+              <aside className="relative mx-auto w-full max-w-[980px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.2)] ring-1 ring-slate-200/60 reserve-surface-lift">
+                <div className="absolute inset-0 aspect-[3/1]">
                   <img
                     src="/Newhero.png"
                     alt="Carsgidi hero"
@@ -1587,7 +1587,7 @@ export default function ReservePage() {
                     style={{ objectPosition: "center" }}
                   />
                 </div>
-                <div className="relative h-full flex flex-col justify-end">
+                <div className="relative aspect-[3/1] flex flex-col justify-end">
                   <div className="w-full md:absolute md:left-1/2 md:bottom-2 md:-translate-x-1/2 md:w-[calc(100%-1rem)] md:grid md:gap-1 md:rounded-2xl md:border md:border-white/80 md:bg-white/95 md:p-1 md:shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] md:backdrop-blur md:reserve-card-reveal md:reserve-card-reveal-late md:reserve-surface-lift md:bottom-4 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:items-end md:p-2 lg:bottom-6 lg:w-[calc(100%-3rem)]">
                     <div className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 mb-2 md:mb-0">
                       <p className={`${displayFont.className} text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700 md:text-xs`}>
