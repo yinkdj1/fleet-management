@@ -39,7 +39,7 @@ function CheckoutForm({ amount, onSuccess, onError, onPaymentReady }: CheckoutFo
   const confirmPayment = async () => {
     if (!stripe || !elements) {
       onError("Payment system not ready");
-      return;
+      throw new Error("Payment system not ready");
     }
 
     setProcessing(true);
@@ -57,22 +57,25 @@ function CheckoutForm({ amount, onSuccess, onError, onPaymentReady }: CheckoutFo
       if (error) {
         onError(error.message || "Payment failed");
         setMessage(error.message || "Payment failed");
+        setProcessing(false);
         throw new Error(error.message || "Payment failed");
       } else if (paymentIntent && paymentIntent.status === "succeeded") {
         onSuccess(paymentIntent.id);
         setMessage("Payment successful!");
+        // Don't set processing to false here - let the parent handle completion
+        return; // Success - don't throw
       } else {
         onError("Payment was not completed");
         setMessage("Payment was not completed");
+        setProcessing(false);
         throw new Error("Payment was not completed");
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
       onError(errorMessage);
       setMessage(errorMessage);
-      throw err;
-    } finally {
       setProcessing(false);
+      throw err;
     }
   };
 
