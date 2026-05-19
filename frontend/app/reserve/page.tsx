@@ -1583,7 +1583,7 @@ export default function ReservePage() {
                     alt="Carsgidi hero"
                     width={1307}
                     height={871}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                     style={{ objectPosition: "center" }}
                   />
                 </div>
