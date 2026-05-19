@@ -1,5 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { Inter } from "next/font/google";
 import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../lib/api";
@@ -1578,13 +1579,14 @@ export default function ReservePage() {
             <div className="grid grid-cols-1 gap-6">
               <aside className="relative mx-auto w-full max-w-[980px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.2)] ring-1 ring-slate-200/60 reserve-surface-lift min-h-[420px] sm:min-h-0">
                 <div className="absolute inset-0 aspect-[3/1] min-h-[420px] sm:min-h-0">
-                  <img
-                    src="/latesthero.png"
+                  <Image
+                    src="/Latesthero.png"
                     alt="Carsgidi hero"
                     width={1307}
                     height={871}
                     className="h-full w-full object-cover"
                     style={{ objectPosition: "center" }}
+                    priority
                   />
                 </div>
                 <div className="relative aspect-[3/1] min-h-[420px] sm:min-h-0 flex flex-col justify-end p-4">
