@@ -44,12 +44,19 @@ Return: ${booking.returnDatetime}</p>`;
 }
 async function monitorTrips() {
   // Fetch all active bookings
-  const { data: bookings } = await bookingService.getBookings({ status: "active", limit: 1000 });
+  const { data: bookings } = await bookingService.getBookings({ status: "active", limit: 10000 });
   const now = new Date();
   const alerts = [];
+  
+  console.log(`[TripMonitor] Checking ${bookings.length} active bookings at ${now.toISOString()}`);
 
   for (const booking of bookings) {
     const isLate = booking.status === "active" && new Date(booking.returnDatetime) < now;
+    
+    if (isLate) {
+      console.log(`[TripMonitor] Found late booking #${booking.id}, return was ${booking.returnDatetime}`);
+    }
+    
     if (isLate) {
       const hoursOverdue = (now - new Date(booking.returnDatetime)) / (1000 * 60 * 60);
       
