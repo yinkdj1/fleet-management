@@ -2582,7 +2582,7 @@ export default function ReservePage() {
 
       </div>
 
-      <section className="relative z-10 mx-auto mt-6 grid w-full max-w-7xl grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section className="relative z-10 mx-auto mt-6 grid w-full max-w-[980px] grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <article
             className="rounded-2xl border border-slate-700/60 bg-slate-900 px-4 py-4 shadow-[0_14px_26px_-18px_rgba(15,23,42,0.45)] transition hover:-translate-y-0.5"
           >
