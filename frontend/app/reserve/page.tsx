@@ -1445,7 +1445,6 @@ export default function ReservePage() {
         returnDatetime: new Date(form.returnDatetime).toISOString(),
         paymentStatus: "paid",
         paymentReference: form.paymentReference.trim(),
-        paymentConfirmed: form.paymentConfirmed,
       });
 
       const bookingId = res.data?.data?.id;
