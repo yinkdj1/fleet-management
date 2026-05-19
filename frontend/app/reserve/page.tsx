@@ -1587,8 +1587,8 @@ export default function ReservePage() {
                     style={{ objectPosition: "center" }}
                   />
                 </div>
-                <div className="relative aspect-[3/1] min-h-[420px] sm:min-h-0 flex flex-col justify-end p-3">
-                  <div className="w-full md:absolute md:left-1/2 md:bottom-2 md:-translate-x-1/2 md:w-[calc(100%-1rem)] md:grid md:gap-1 md:rounded-2xl md:border md:border-white/80 md:bg-white/95 md:p-1 md:shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] md:backdrop-blur md:reserve-card-reveal md:reserve-card-reveal-late md:reserve-surface-lift md:bottom-4 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:items-end md:p-2 lg:bottom-6 lg:w-[calc(100%-3rem)] space-y-2 md:space-y-0">
+                <div className="relative aspect-[3/1] min-h-[420px] sm:min-h-0 flex flex-col justify-end p-4">
+                  <div className="w-full md:absolute md:left-1/2 md:bottom-2 md:-translate-x-1/2 md:w-[calc(100%-1rem)] md:grid md:gap-1 md:rounded-2xl md:border md:border-white/80 md:bg-white/95 md:p-1 md:shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] md:backdrop-blur md:reserve-card-reveal md:reserve-card-reveal-late md:reserve-surface-lift md:bottom-4 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:items-end md:p-2 lg:bottom-6 lg:w-[calc(100%-3rem)] space-y-3 md:space-y-0">
                     <div className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 mb-2 md:mb-0">
                       <p className={`${displayFont.className} text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-900 md:text-xs md:text-blue-700`}>
                         Pickup location
@@ -1631,7 +1631,8 @@ export default function ReservePage() {
                         <p className="mt-1 text-sm text-red-600">{fieldErrors.returnDatetime}</p>
                       )}
                     </div>
-                    <div className="md:bg-transparent md:backdrop-blur-none md:p-0">
+                    <div className="rounded-xl bg-white/95 backdrop-blur-sm p-2 md:bg-transparent md:backdrop-blur-none md:p-0">
+                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-900 md:hidden`}>Search cars</label>
                       <button
                         type="button"
                         onClick={handleSearchCars}
