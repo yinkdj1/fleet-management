@@ -1656,7 +1656,7 @@ export default function ReservePage() {
             </div>
 
               <section
-                className={`rounded-3xl p-4 shadow-[0_28px_80px_-38px_rgba(15,23,42,0.2)] reserve-card-reveal reserve-card-reveal-delayed reserve-surface-lift md:p-5 ${
+                className={`mx-auto w-full max-w-[980px] rounded-3xl p-4 shadow-[0_28px_80px_-38px_rgba(15,23,42,0.2)] reserve-card-reveal reserve-card-reveal-delayed reserve-surface-lift md:p-5 ${
                   isShowingAvailableCars ? "md:min-h-[640px]" : ""
                 } ${isNightTheme ? "bg-slate-800 text-slate-100 night-mode-section" : "bg-white"}`}
               >
