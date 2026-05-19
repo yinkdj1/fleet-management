@@ -1577,8 +1577,8 @@ export default function ReservePage() {
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
-              <aside className="relative mx-auto w-full max-w-[980px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.2)] ring-1 ring-slate-200/60 reserve-surface-lift min-h-[420px] sm:min-h-0">
-                <div className="absolute inset-0 aspect-[3/1] min-h-[420px] sm:min-h-0">
+              <aside className="relative mx-auto w-full max-w-[980px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_80px_-40px_rgba(15,23,42,0.2)] ring-1 ring-slate-200/60 reserve-surface-lift min-h-[500px] sm:min-h-0">
+                <div className="absolute inset-0 aspect-[3/1] min-h-[500px] sm:min-h-0">
                   <Image
                     src="/Latesthero.png"
                     alt="Carsgidi hero"
@@ -1589,33 +1589,33 @@ export default function ReservePage() {
                     priority
                   />
                 </div>
-                <div className="relative aspect-[3/1] min-h-[420px] sm:min-h-0 flex flex-col justify-end p-4">
-                  <div className="w-full md:absolute md:left-1/2 md:bottom-2 md:-translate-x-1/2 md:w-[calc(100%-1rem)] md:grid md:gap-1 md:rounded-2xl md:border md:border-white/80 md:bg-white/95 md:p-1 md:shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] md:backdrop-blur md:reserve-card-reveal md:reserve-card-reveal-late md:reserve-surface-lift md:bottom-4 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:items-end md:p-2 lg:bottom-6 lg:w-[calc(100%-3rem)] space-y-3 md:space-y-0">
-                    <div className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 mb-2 md:mb-0">
-                      <p className={`${displayFont.className} text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-900 md:text-xs md:text-blue-700`}>
+                <div className="relative aspect-[3/1] min-h-[500px] sm:min-h-0 flex flex-col justify-end p-3">
+                  <div className="w-full md:absolute md:left-1/2 md:bottom-2 md:-translate-x-1/2 md:w-[calc(100%-1rem)] md:grid md:gap-1 md:rounded-2xl md:border md:border-white/80 md:bg-white/95 md:p-1 md:shadow-[0_12px_30px_-18px_rgba(15,23,42,0.5)] md:backdrop-blur md:reserve-card-reveal md:reserve-card-reveal-late md:reserve-surface-lift md:bottom-4 md:w-[calc(100%-2rem)] md:max-w-[860px] md:grid-cols-[1fr_0.95fr_0.95fr_auto] md:items-end md:p-2 lg:bottom-6 lg:w-[calc(100%-3rem)] space-y-2 md:space-y-0">
+                    <div className="rounded-lg border border-slate-200 bg-white px-2 py-1 mb-1.5 md:mb-0 md:rounded-xl md:px-2 md:py-1.5">
+                      <p className={`${displayFont.className} text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-900 md:text-xs md:text-blue-700`}>
                         Pickup location
                       </p>
-                      <p className={`${displayFont.className} mt-0.5 text-sm font-semibold text-zinc-900 md:text-sm`}>
+                      <p className={`${displayFont.className} mt-0.5 text-xs font-semibold text-zinc-900 md:text-sm`}>
                         {pickupLocation}
                       </p>
                     </div>
-                    <div className="mb-2 md:mb-0 rounded-xl bg-white/95 backdrop-blur-sm p-2 md:bg-transparent md:backdrop-blur-none md:p-0">
-                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-900 md:text-sm md:text-zinc-700`}>Pickup date</label>
+                    <div className="mb-1.5 md:mb-0 rounded-lg bg-white/95 backdrop-blur-sm p-1.5 md:rounded-xl md:bg-transparent md:backdrop-blur-none md:p-0">
+                      <label className={`${displayFont.className} mb-0.5 block text-[10px] font-semibold text-zinc-900 md:text-sm md:text-zinc-700`}>Pickup date</label>
                       <input
                         type="datetime-local"
                         name="pickupDatetime"
                         value={form.pickupDatetime}
                         onChange={handleChange}
                         min={new Date().toISOString().slice(0, 16)}
-                        className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1.5 text-xs text-zinc-900 shadow-sm md:p-2 md:text-sm"
+                        className="form-input-modern w-full rounded-lg border border-slate-200 bg-white p-1 text-[11px] text-zinc-900 shadow-sm md:rounded-xl md:p-2 md:text-sm"
                         required
                       />
                       {fieldErrors.pickupDatetime && (
                         <p className="mt-1 text-sm text-red-600">{fieldErrors.pickupDatetime}</p>
                       )}
                     </div>
-                    <div className="mb-2 md:mb-0 rounded-xl bg-white/95 backdrop-blur-sm p-2 md:bg-transparent md:backdrop-blur-none md:p-0">
-                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-900 md:text-sm md:text-zinc-700`}>Return date</label>
+                    <div className="mb-1.5 md:mb-0 rounded-lg bg-white/95 backdrop-blur-sm p-1.5 md:rounded-xl md:bg-transparent md:backdrop-blur-none md:p-0">
+                      <label className={`${displayFont.className} mb-0.5 block text-[10px] font-semibold text-zinc-900 md:text-sm md:text-zinc-700`}>Return date</label>
                       <input
                         type="datetime-local"
                         name="returnDatetime"
@@ -1626,15 +1626,15 @@ export default function ReservePage() {
                             ? getMinimumReturnDatetime(form.pickupDatetime)
                             : undefined
                         }
-                        className="form-input-modern w-full rounded-xl border border-slate-200 bg-white p-1.5 text-xs text-zinc-900 shadow-sm md:p-2 md:text-sm"
+                        className="form-input-modern w-full rounded-lg border border-slate-200 bg-white p-1 text-[11px] text-zinc-900 shadow-sm md:rounded-xl md:p-2 md:text-sm"
                         required
                       />
                       {fieldErrors.returnDatetime && (
                         <p className="mt-1 text-sm text-red-600">{fieldErrors.returnDatetime}</p>
                       )}
                     </div>
-                    <div className="rounded-xl bg-white/95 backdrop-blur-sm p-2 md:bg-transparent md:backdrop-blur-none md:p-0">
-                      <label className={`${displayFont.className} mb-0.5 block text-[11px] font-semibold text-zinc-900 md:hidden`}>Search cars</label>
+                    <div className="rounded-lg bg-white/95 backdrop-blur-sm p-1.5 md:rounded-xl md:bg-transparent md:backdrop-blur-none md:p-0">
+                      <label className={`${displayFont.className} mb-0.5 block text-[10px] font-semibold text-zinc-900 md:hidden`}>Search cars</label>
                       <button
                         type="button"
                         onClick={handleSearchCars}
@@ -1642,7 +1642,7 @@ export default function ReservePage() {
                           event.preventDefault();
                           handleSearchCars();
                         }}
-                        className={`${displayFont.className} touch-manipulation relative z-[120] h-[34px] w-full rounded-xl bg-[linear-gradient(135deg,#2563eb,#0ea5e9)] px-2 py-1 text-[11px] font-semibold tracking-[0.01em] text-white shadow-[0_12px_24px_-12px_rgba(37,99,235,0.8)] transition active:scale-[0.99] hover:-translate-y-0.5 hover:shadow-[0_18px_30px_-14px_rgba(37,99,235,0.85)] md:h-[38px] md:px-2.5 md:py-1.5 md:text-sm`}
+                        className={`${displayFont.className} touch-manipulation relative z-[120] h-[30px] w-full rounded-lg bg-[linear-gradient(135deg,#2563eb,#0ea5e9)] px-2 py-1 text-[10px] font-semibold tracking-[0.01em] text-white shadow-[0_12px_24px_-12px_rgba(37,99,235,0.8)] transition active:scale-[0.99] hover:-translate-y-0.5 hover:shadow-[0_18px_30px_-14px_rgba(37,99,235,0.85)] md:h-[38px] md:rounded-xl md:px-2.5 md:py-1.5 md:text-sm`}
                       >
                         Search Cars
                       </button>
