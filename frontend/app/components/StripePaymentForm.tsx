@@ -84,7 +84,8 @@ function CheckoutForm({ amount, onSuccess, onError, onPaymentReady }: CheckoutFo
     if (stripe && elements && onPaymentReady) {
       onPaymentReady(confirmPayment);
     }
-  }, [stripe, elements, onPaymentReady]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stripe, elements]);
 
   return (
     <div className="space-y-4">

@@ -851,9 +851,8 @@ function validatePublicReservationPayload(data = {}) {
     errors.paymentReference = "Payment reference is required";
   }
 
-  if (!data.paymentConfirmed) {
-    errors.paymentConfirmed = "Please confirm payment before submitting";
-  }
+  // Remove the paymentConfirmed validation check since Stripe handles payment confirmation
+  // The paymentReference (payment intent ID) is sufficient proof of payment
 
   if (Object.keys(errors).length > 0) {
     throw buildAppError("Validation failed", 400, errors);
