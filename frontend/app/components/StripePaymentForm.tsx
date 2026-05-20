@@ -38,8 +38,11 @@ function CheckoutForm({ amount, onSuccess, onError, onPaymentReady }: CheckoutFo
 
   const confirmPayment = async () => {
     if (!stripe || !elements) {
-      onError("Payment system not ready");
-      throw new Error("Payment system not ready");
+      const errorMsg = "Payment system not ready";
+      onError(errorMsg);
+      setMessage(errorMsg);
+      setProcessing(false);
+      throw new Error(errorMsg);
     }
 
     setProcessing(true);
@@ -55,25 +58,31 @@ function CheckoutForm({ amount, onSuccess, onError, onPaymentReady }: CheckoutFo
       });
 
       if (error) {
-        onError(error.message || "Payment failed");
-        setMessage(error.message || "Payment failed");
+        const errorMsg = error.message || "Payment failed";
+        onError(errorMsg);
+        setMessage(errorMsg);
         setProcessing(false);
-        throw new Error(error.message || "Payment failed");
+        throw new Error(errorMsg);
       } else if (paymentIntent && paymentIntent.status === "succeeded") {
         onSuccess(paymentIntent.id);
         setMessage("Payment successful!");
-        // Don't set processing to false here - let the parent handle completion
-        return; // Success - don't throw
-      } else {
-        onError("Payment was not completed");
-        setMessage("Payment was not completed");
         setProcessing(false);
-        throw new Error("Payment was not completed");
+        // Success - don't throw, just return
+        return;
+      } else {
+        const errorMsg = "Payment was not completed";
+        onError(errorMsg);
+        setMessage(errorMsg);
+        setProcessing(false);
+        throw new Error(errorMsg);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
-      onError(errorMessage);
-      setMessage(errorMessage);
+      // Only handle errors that haven't been handled above
+      if (err instanceof Error && !err.message.includes("Payment")) {
+        const errorMessage = "An unexpected error occurred";
+        onError(errorMessage);
+        setMessage(errorMessage);
+      }
       setProcessing(false);
       throw err;
     }
