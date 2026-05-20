@@ -5,9 +5,10 @@ const { monitorTrips } = require('../services/tripMonitoringService');
 async function getTripAlerts(req, res) {
   try {
     const alerts = await monitorTrips();
-    res.json({ data: alerts });
+    res.json({ success: true, data: alerts });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to monitor trips', details: err.message });
+    console.error('[TripMonitorController] Error:', err);
+    res.status(500).json({ success: false, error: 'Failed to monitor trips', details: err.message });
   }
 }
 
