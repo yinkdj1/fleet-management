@@ -2,6 +2,7 @@
 const { monitorTrips } = require('../services/tripMonitoringService');
 
 // GET /api/monitor/trips
+// Returns trip monitoring alerts for active bookings
 async function getTripAlerts(req, res) {
   try {
     const alerts = await monitorTrips();
