@@ -43,14 +43,15 @@ Return: ${booking.returnDatetime}</p>`;
   await sendEmail({ to: ADMIN_EMAIL, subject, html, text: html.replace(/<[^>]+>/g, "") });
 }
 async function monitorTrips() {
-  // Fetch all active bookings
-  const { data: bookings } = await bookingService.getBookings({ status: "active", limit: 10000 });
-  const now = new Date();
-  const alerts = [];
-  
-  console.log(`[TripMonitor] Checking ${bookings.length} active bookings at ${now.toISOString()}`);
+  try {
+    // Fetch all active bookings
+    const { data: bookings } = await bookingService.getBookings({ status: "active", limit: 10000 });
+    const now = new Date();
+    const alerts = [];
+    
+    console.log(`[TripMonitor] Checking ${bookings.length} active bookings at ${now.toISOString()}`);
 
-  for (const booking of bookings) {
+    for (const booking of bookings) {
     const isLate = booking.status === "active" && new Date(booking.returnDatetime) < now;
     
     if (isLate) {
@@ -167,9 +168,13 @@ async function monitorTrips() {
         message: `Booking ${booking.id} is late for return (within 24h grace period).`,
       });
     }
-  }
+    }
 
-  return alerts;
+    return alerts;
+  } catch (error) {
+    console.error('[TripMonitor] Error in monitorTrips:', error);
+    throw error;
+  }
 }
 
 module.exports = { monitorTrips };
