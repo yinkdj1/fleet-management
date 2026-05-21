@@ -277,7 +277,7 @@ export default function ReportsPage() {
   }, [period]);
 
   const Stats = data ? (period === "weekly" ? data.weekly : data.monthly) : null;
-  const trend = data ? (period === "weekly" ? data.weeklyTrend : data.monthlyTrend) : [];
+  const trend = data ? (period === "weekly" ? data.weeklyTrend || [] : data.monthlyTrend || []) : [];
   const trendDetails = data
     ? period === "weekly"
       ? data.weeklyTrendDetails || []
