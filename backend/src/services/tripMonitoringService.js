@@ -92,17 +92,22 @@ async function monitorTrips() {
       const marker = await hasExtensionOfferMarker(booking.id);
       if (!marker) {
         // Send extension offer to guest
-        const { buildGuestManageLinks } = bookingService;
-        const links = buildGuestManageLinks(booking);
-        const subject = `Your booking is overdue - extend now?`;
-        const html = `<p>Your booking #${booking.id} is overdue. <br>You can extend your trip instantly here: <a href="${links.modifyUrl}">${links.modifyUrl}</a></p>`;
-        if (booking.customer?.email) {
-          await sendEmail({ to: booking.customer.email, subject, html, text: html.replace(/<[^>]+>/g, "") });
+        try {
+          const { buildGuestManageLinks } = bookingService;
+          const links = buildGuestManageLinks(booking);
+          const subject = `Your booking is overdue - extend now?`;
+          const html = `<p>Your booking #${booking.id} is overdue. <br>You can extend your trip instantly here: <a href="${links.modifyUrl}">${links.modifyUrl}</a></p>`;
+          if (booking.customer?.email) {
+            await sendEmail({ to: booking.customer.email, subject, html, text: html.replace(/<[^>]+>/g, "") });
+          }
+          if (booking.customer?.phone) {
+            await sendSMS(booking.customer.phone, `Your booking #${booking.id} is overdue. Extend here: ${links.modifyUrl}`);
+          }
+          await markExtensionOfferSent(booking.id);
+        } catch (linkError) {
+          console.error(`[TripMonitor] Failed to send extension offer for booking #${booking.id}:`, linkError);
+          // Continue processing other bookings even if this one fails
         }
-        if (booking.customer?.phone) {
-          await sendSMS(booking.customer.phone, `Your booking #${booking.id} is overdue. Extend here: ${links.modifyUrl}`);
-        }
-        await markExtensionOfferSent(booking.id);
       } else {
         // Check if ignored for > EXTENSION_IGNORE_HOURS
         const sentTime = marker.fileUrl?.replace("sent:", "");
