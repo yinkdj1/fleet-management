@@ -19,10 +19,18 @@ export default function MonitoringPage() {
       setError("");
       try {
         const res = await fetch("/api/monitor/trips");
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
         const data = await res.json();
+        console.log('[Monitoring] API response:', data);
+        if (data.success === false) {
+          throw new Error(data.error || 'Failed to load alerts');
+        }
         setAlerts(data.data || []);
       } catch (err) {
-        setError("Failed to load trip monitoring alerts.");
+        console.error('[Monitoring] Error:', err);
+        setError(err instanceof Error ? err.message : "Failed to load trip monitoring alerts.");
       } finally {
         setLoading(false);
       }
