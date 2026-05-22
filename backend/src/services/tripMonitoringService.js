@@ -89,46 +89,32 @@ async function monitorTrips() {
         booking, // Include full booking data for frontend
       });
 
-      // Smart extension offer logic
+      // Track if extension offer needs to be sent (don't send here, just flag it)
       const marker = await hasExtensionOfferMarker(booking.id);
       if (!marker) {
-        // Send extension offer to guest
-        try {
-          const { buildGuestManageLinks } = bookingService;
-          const links = buildGuestManageLinks(booking);
-          const subject = `Your booking is overdue - extend now?`;
-          const html = `<p>Your booking #${booking.id} is overdue. <br>You can extend your trip instantly here: <a href="${links.modifyUrl}">${links.modifyUrl}</a></p>`;
-          if (booking.customer?.email) {
-            await sendEmail({ to: booking.customer.email, subject, html, text: html.replace(/<[^>]+>/g, "") });
-          }
-          if (booking.customer?.phone) {
-            await sendSMS(booking.customer.phone, `Your booking #${booking.id} is overdue. Extend here: ${links.modifyUrl}`);
-          }
-          await markExtensionOfferSent(booking.id);
-        } catch (linkError) {
-          console.error(`[TripMonitor] Failed to send extension offer for booking #${booking.id}:`, linkError);
-          // Continue processing other bookings even if this one fails
-        }
+        alerts.push({
+          bookingId: booking.id,
+          type: "needs_extension_offer",
+          message: `Booking ${booking.id} needs extension offer email`,
+          internal: true, // Don't show to frontend
+        });
       } else {
-        // Check if ignored for > EXTENSION_IGNORE_HOURS
+        // Check if admin needs to be notified about ignored extension
         const sentTime = marker.fileUrl?.replace("sent:", "");
         if (sentTime) {
           const sentDate = new Date(sentTime);
           if (now - sentDate > EXTENSION_IGNORE_HOURS * 60 * 60 * 1000) {
-            // Only notify admin once — check for a separate admin-notified marker
             const prisma = require("../config/db");
             const adminMarker = await prisma.document.findFirst({
               where: { bookingId: Number(booking.id), documentType: "extension_admin_notified" },
               select: { id: true },
             });
             if (!adminMarker) {
-              await notifyAdminExtensionIgnored(booking);
-              await prisma.document.create({
-                data: {
-                  bookingId: Number(booking.id),
-                  documentType: "extension_admin_notified",
-                  fileUrl: `sent:${new Date().toISOString()}`,
-                },
+              alerts.push({
+                bookingId: booking.id,
+                type: "needs_admin_notification",
+                message: `Admin needs notification about ignored extension for booking ${booking.id}`,
+                internal: true, // Don't show to frontend
               });
             }
           }
