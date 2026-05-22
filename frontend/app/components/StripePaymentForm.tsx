@@ -45,6 +45,12 @@ function CheckoutForm({ amount, onSuccess, onError, onPaymentReady }: CheckoutFo
       throw new Error(errorMsg);
     }
 
+    // Prevent double confirmation
+    if (processing) {
+      console.log('[StripePayment] Already processing, skipping duplicate confirmation');
+      return;
+    }
+
     setProcessing(true);
     setMessage(null);
 
@@ -58,6 +64,20 @@ function CheckoutForm({ amount, onSuccess, onError, onPaymentReady }: CheckoutFo
       });
 
       if (error) {
+        // Check if error is because payment already succeeded
+        if (error.type === 'invalid_request_error' && 
+            error.message?.includes('already succeeded')) {
+          console.log('[StripePayment] Payment already succeeded, treating as success');
+          // Extract payment intent ID from error if available
+          const piMatch = error.message.match(/pi_[a-zA-Z0-9]+/);
+          if (piMatch) {
+            onSuccess(piMatch[0]);
+            setMessage("Payment successful!");
+            setProcessing(false);
+            return;
+          }
+        }
+        
         const errorMsg = error.message || "Payment failed";
         onError(errorMsg);
         setMessage(errorMsg);
