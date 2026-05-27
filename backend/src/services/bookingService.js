@@ -1339,28 +1339,31 @@ async function createPublicReservation(data) {
     paymentStatus: "paid",
   });
 
-  // Send notifications asynchronously without blocking the response
-  Promise.all([
-    sendReservationConfirmationEmail(booking).catch(err => 
-      console.error('Failed to send confirmation email:', err)
-    ),
-    sendReservationConfirmationSms(booking).catch(err => 
-      console.error('Failed to send confirmation SMS:', err)
-    )
-  ]);
+  // Send email first, then send SMS; include actual delivery results in the response.
+  const emailResult = await sendReservationConfirmationEmail(booking).catch((err) => {
+    console.error("Failed to send confirmation email:", err);
+    return {
+      sent: false,
+      reason: "email_error",
+      message: "Reservation created, but confirmation email failed.",
+      links: null,
+    };
+  });
+
+  const smsResult = await sendReservationConfirmationSms(booking).catch((err) => {
+    console.error("Failed to send confirmation SMS:", err);
+    return {
+      sent: false,
+      reason: "sms_error",
+      message: "Reservation created, but confirmation SMS failed.",
+      links: emailResult?.links ?? null,
+    };
+  });
 
   return {
     ...booking,
-    confirmationEmail: {
-      sent: false,
-      message: "Confirmation email is being sent in the background.",
-      links: null,
-    },
-    confirmationSms: {
-      sent: false,
-      message: "Confirmation SMS is being sent in the background.",
-      links: null,
-    },
+    confirmationEmail: emailResult,
+    confirmationSms: smsResult,
   };
 }
 
