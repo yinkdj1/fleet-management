@@ -1341,21 +1341,23 @@ async function createPublicReservation(data) {
 
   // Send email first, then send SMS; include actual delivery results in the response.
   const emailResult = await sendReservationConfirmationEmail(booking).catch((err) => {
-    console.error("Failed to send confirmation email:", err);
+    console.error("Failed to send confirmation email:", err?.message || err);
     return {
       sent: false,
-      reason: "email_error",
-      message: "Reservation created, but confirmation email failed.",
+      reason: err?.code || "email_error",
+      message:
+        err?.message || "Reservation created, but confirmation email failed.",
       links: null,
     };
   });
 
   const smsResult = await sendReservationConfirmationSms(booking).catch((err) => {
-    console.error("Failed to send confirmation SMS:", err);
+    console.error("Failed to send confirmation SMS:", err?.message || err);
     return {
       sent: false,
-      reason: "sms_error",
-      message: "Reservation created, but confirmation SMS failed.",
+      reason: err?.code || "sms_error",
+      message:
+        err?.message || "Reservation created, but confirmation SMS failed.",
       links: emailResult?.links ?? null,
     };
   });

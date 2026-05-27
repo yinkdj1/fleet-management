@@ -45,18 +45,24 @@ async function sendEmail({ to, subject, html, text }) {
     };
   }
 
-  await smtpTransporter.sendMail({
-    from: process.env.SMTP_FROM,
-    to,
-    subject,
-    html,
-    text,
-  });
+  try {
+    await smtpTransporter.sendMail({
+      from: process.env.SMTP_FROM,
+      to,
+      subject,
+      html,
+      text,
+    });
 
-  return {
-    sent: true,
-    reason: "smtp",
-  };
+    return {
+      sent: true,
+      reason: "smtp",
+    };
+  } catch (error) {
+    console.error("Email send failure:", error?.message || error);
+    error.message = `SMTP send failed: ${error.message || "unknown error"}`;
+    throw error;
+  }
 }
 
 module.exports = {
