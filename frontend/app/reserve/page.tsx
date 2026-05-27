@@ -2266,7 +2266,11 @@ export default function ReservePage() {
                     {showAddressSuggestions && addressSuggestions.length > 0 && (
                       <div
                         id="address-suggestions-list"
-                        className="absolute left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl"
+                        className={`absolute left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto rounded-xl border shadow-xl ${
+                          isNightTheme 
+                            ? "border-slate-600 bg-slate-700" 
+                            : "border-slate-200 bg-white"
+                        }`}
                       >
                         {addressSuggestions.map((suggestion, index) => (
                           <button
@@ -2277,8 +2281,14 @@ export default function ReservePage() {
                               event.preventDefault();
                               handleAddressSuggestionSelect(suggestion);
                             }}
-                            className={`block w-full border-b border-slate-100 px-3 py-2 text-left text-sm font-medium text-zinc-900 last:border-b-0 hover:bg-slate-50 ${
-                              activeAddressSuggestionIndex === index ? "bg-slate-100" : ""
+                            className={`block w-full border-b px-3 py-2 text-left text-sm font-medium last:border-b-0 ${
+                              isNightTheme
+                                ? `border-slate-600 text-zinc-100 hover:bg-slate-600 ${
+                                    activeAddressSuggestionIndex === index ? "bg-slate-600" : ""
+                                  }`
+                                : `border-slate-100 text-zinc-900 hover:bg-slate-50 ${
+                                    activeAddressSuggestionIndex === index ? "bg-slate-100" : ""
+                                  }`
                             }`}
                           >
                             {suggestion.displayName}
