@@ -19,7 +19,7 @@ function getTransporter() {
     return null;
   }
 
-  transporter = nodemailer.createTransport({
+  const config = {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT),
     secure: toBoolean(process.env.SMTP_SECURE),
@@ -30,7 +30,13 @@ function getTransporter() {
             pass: process.env.SMTP_PASS,
           }
         : undefined,
-  });
+  };
+
+  console.log(
+    `[SMTP] Configuring transporter: host=${config.host}, port=${config.port}, secure=${config.secure}, auth=${Boolean(config.auth)}`
+  );
+
+  transporter = nodemailer.createTransport(config);
 
   return transporter;
 }
@@ -46,6 +52,7 @@ async function sendEmail({ to, subject, html, text }) {
   }
 
   try {
+    console.log(`[SMTP] Attempting to send email to ${to}`);
     await smtpTransporter.sendMail({
       from: process.env.SMTP_FROM,
       to,
@@ -53,13 +60,16 @@ async function sendEmail({ to, subject, html, text }) {
       html,
       text,
     });
+    console.log(`[SMTP] Successfully sent email to ${to}`);
 
     return {
       sent: true,
       reason: "smtp",
     };
   } catch (error) {
-    console.error("Email send failure:", error?.message || error);
+    console.error(
+      `[SMTP] Email send failure to ${to}: code=${error?.code}, message=${error?.message || error}`
+    );
     error.message = `SMTP send failed: ${error.message || "unknown error"}`;
     throw error;
   }
