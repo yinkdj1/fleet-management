@@ -62,6 +62,7 @@ export default function BookingsPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
   const [sendingPrecheckoutId, setSendingPrecheckoutId] = useState<number | null>(null);
+  const [deletingBookingId, setDeletingBookingId] = useState<number | null>(null);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [editPickupDatetime, setEditPickupDatetime] = useState("");
   const [editReturnDatetime, setEditReturnDatetime] = useState("");
@@ -380,6 +381,28 @@ export default function BookingsPage() {
                   Swap Vehicle
                 </button>
               )}
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const ok = window.confirm(`Delete booking ${formatBookingId(booking.id)}? This cannot be undone.`);
+                  if (!ok) return;
+                  try {
+                    setDeletingBookingId(booking.id);
+                    await api.delete(`/bookings/${booking.id}`);
+                    setActionMessage(`Booking ${formatBookingId(booking.id)} deleted.`);
+                    await refreshBookings();
+                  } catch (err: any) {
+                    setActionError(err.response?.data?.message || `Failed to delete booking ${formatBookingId(booking.id)}.`);
+                  } finally {
+                    setDeletingBookingId(null);
+                  }
+                }}
+                disabled={deletingBookingId === booking.id}
+                className="bg-red-600 text-white px-3 py-1 rounded inline-block disabled:opacity-60"
+              >
+                {deletingBookingId === booking.id ? "Deleting..." : "Delete"}
+              </button>
             </div>
         </td>
 

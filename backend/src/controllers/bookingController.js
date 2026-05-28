@@ -91,6 +91,15 @@ async function createGuestPrecheckoutLink(req, res, next) {
   }
 }
 
+async function deleteBooking(req, res, next) {
+  try {
+    const result = await bookingService.deleteBooking(req.params.id);
+    res.json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getBookings,
   getBookingById,
@@ -102,4 +111,5 @@ module.exports = {
   checkoutBooking,
   checkinBooking,
   createGuestPrecheckoutLink,
+  deleteBooking,
 };

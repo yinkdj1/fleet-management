@@ -2415,6 +2415,35 @@ async function checkinBooking(id, data, photos = []) {
   };
 }
 
+async function deleteBooking(id) {
+  const booking = await getBookingById(id);
+
+  // Only allow deletion for draft or reserved bookings
+  if (!["draft", "reserved"].includes(String(booking.status || "").toLowerCase())) {
+    throw buildAppError("Only draft or reserved bookings can be deleted", 400);
+  }
+
+  // Prevent deletion if checkout or checkin exists
+  if (booking.checkout || booking.checkin) {
+    throw buildAppError("Cannot delete booking with checkout/checkin records", 400);
+  }
+
+  // Delete the booking record
+  const deleted = await prisma.booking.delete({ where: { id: Number(id) } });
+
+  // Re-evaluate vehicle status for the vehicle that was reserved
+  try {
+    await reevaluateVehicleStatus(deleted.vehicleId);
+  } catch (err) {
+    console.warn("Failed to reevaluate vehicle status after booking delete:", err?.message || err);
+  }
+
+  return {
+    deleted: true,
+    bookingId: deleted.id,
+  };
+}
+
 module.exports = {
   getBookings,
   getBookingById,
@@ -2446,4 +2475,5 @@ module.exports = {
   buildGuestManageLinks,
   getActiveTemplate,
   renderSmsTemplate,
+  deleteBooking,
 };

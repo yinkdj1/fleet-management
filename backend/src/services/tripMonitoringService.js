@@ -91,11 +91,12 @@ async function monitorTrips() {
 
       // Track if extension offer needs to be sent (don't send here, just flag it)
       const marker = await hasExtensionOfferMarker(booking.id);
-      if (!marker) {
+      // Only request extension offers for bookings overdue by configured threshold (>= 2 hours)
+      if (!marker && hoursOverdue >= 2) {
         alerts.push({
           bookingId: booking.id,
           type: "needs_extension_offer",
-          message: `Booking ${booking.id} needs extension offer email`,
+          message: `Booking ${booking.id} needs extension offer email (overdue ${Math.floor(hoursOverdue)}h)`,
           internal: true, // Don't show to frontend
         });
       } else {

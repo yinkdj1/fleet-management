@@ -35,6 +35,9 @@ router.patch("/:id/status", protect, changeBookingStatus);
 router.patch("/:id/reschedule", protect, rescheduleBooking);
 router.post("/:id/precheckout-link", protect, createGuestPrecheckoutLink);
 
+// delete booking
+router.delete("/:id", protect, require("../controllers/bookingController").deleteBooking);
+
 // ✅ photo upload routes
 router.post("/:id/checkout", protect, upload.array("photos", 20), checkoutBooking);
 router.post("/:id/checkin", protect, upload.array("photos", 20), checkinBooking);
