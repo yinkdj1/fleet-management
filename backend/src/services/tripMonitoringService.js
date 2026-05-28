@@ -86,6 +86,7 @@ async function monitorTrips() {
         hoursOverdue: Math.floor(hoursOverdue),
         lateFeeStatus,
         extraDayFeeStatus,
+        amountDue: Number(booking.totalAmount || 0),
         booking, // Include full booking data for frontend
       });
 

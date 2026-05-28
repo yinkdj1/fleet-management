@@ -10,6 +10,7 @@ interface TripAlert {
   hoursOverdue?: number;
   lateFeeStatus?: string | null;
   extraDayFeeStatus?: string | null;
+  amountDue?: number;
   booking?: {
     id: number;
     customer?: {
@@ -129,6 +130,11 @@ export default function MonitoringPage() {
                         {alert.hoursOverdue && (
                           <div className="text-sm text-red-600 font-medium mt-1">
                             {alert.hoursOverdue} hours overdue
+                          </div>
+                        )}
+                        {typeof alert.amountDue === 'number' && (
+                          <div className="text-sm text-zinc-700 mt-1">
+                            Amount due: ${alert.amountDue.toFixed(2)}
                           </div>
                         )}
                       </>
