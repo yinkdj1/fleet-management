@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const twilio = require("twilio");
 const { handleIdentityWebhook } = require("../services/stripeIdentityService");
+const { handleStripeWebhook } = require("../services/stripeWebhookService");
 
 /**
  * POST /api/webhooks/sms
@@ -60,6 +61,16 @@ router.post("/stripe-identity", async (req, res, next) => {
     const signature = req.headers["stripe-signature"];
     // req.body is raw Buffer (set by express.raw in app.js)
     const result = await handleIdentityWebhook(req.body, signature);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/stripe', async (req, res, next) => {
+  try {
+    const signature = req.headers['stripe-signature'];
+    const result = await handleStripeWebhook(req.body, signature);
     res.json(result);
   } catch (err) {
     next(err);
