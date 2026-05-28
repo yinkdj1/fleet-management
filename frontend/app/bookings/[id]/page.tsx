@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import api from "../../../lib/api";
 import { formatBookingId } from "../../../lib/bookingId";
 import { formatCustomerName } from "../../../lib/displayHelpers";
@@ -57,6 +57,7 @@ type BookingDetail = {
 export default function BookingDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const bookingId = params.id;
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [error, setError] = useState("");
@@ -73,6 +74,7 @@ export default function BookingDetailPage() {
   const [editVehicleUnavailable, setEditVehicleUnavailable] = useState(false);
   const [cancellingBooking, setCancellingBooking] = useState(false);
   const [cancellationMessage, setCancellationMessage] = useState("");
+  const [deletingBooking, setDeletingBooking] = useState(false);
   const [minPickupDatetime, setMinPickupDatetime] = useState("");
 
   // Checkout edit state
@@ -376,6 +378,30 @@ export default function BookingDetailPage() {
           >
             Back to Bookings
           </Link>
+          {booking && (booking.status === "draft" || booking.status === "reserved") && (
+            <button
+              type="button"
+              onClick={async () => {
+                if (!booking) return;
+                const ok = window.confirm(`Delete booking ${formatBookingId(booking.id)}? This cannot be undone.`);
+                if (!ok) return;
+                try {
+                  setDeletingBooking(true);
+                  await api.delete(`/bookings/${booking.id}`);
+                  // Redirect back to bookings list
+                  router.push("/bookings");
+                } catch (err: any) {
+                  setError(err.response?.data?.message || `Failed to delete booking ${formatBookingId(booking.id)}.`);
+                } finally {
+                  setDeletingBooking(false);
+                }
+              }}
+              disabled={deletingBooking}
+              className="bg-red-600 text-white px-4 py-2 rounded"
+            >
+              {deletingBooking ? "Deleting..." : "Delete Booking"}
+            </button>
+          )}
         </div>
       </div>
 
