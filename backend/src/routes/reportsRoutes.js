@@ -66,7 +66,7 @@ router.get("/", async (req, res, next) => {
 
     const bookings = await prisma.booking.findMany({
       where: {
-        createdAt: {
+        pickupDatetime: {
           gte: startDate,
         },
       },
@@ -97,7 +97,7 @@ router.get("/", async (req, res, next) => {
     let totalMonthlyRevenue = 0;
 
     for (const booking of bookings) {
-      const createdAt = new Date(booking.createdAt);
+      const bookingDate = new Date(booking.pickupDatetime);
       const revenue = Number(booking.totalAmount || 0);
       const vehicleId = booking.vehicleId;
       const vehicle = booking.vehicle;
@@ -109,7 +109,7 @@ router.get("/", async (req, res, next) => {
       const vehicleRow = vehicleMap.get(vehicleId);
 
       const dayIndex = monthlyRange.findIndex(
-        (item) => createdAt >= item.start && createdAt <= item.end
+        (item) => bookingDate >= item.start && bookingDate <= item.end
       );
 
       if (dayIndex >= 0) {
@@ -140,7 +140,7 @@ router.get("/", async (req, res, next) => {
       }
 
       const weeklyDayIndex = weeklyRange.findIndex(
-        (item) => createdAt >= item.start && createdAt <= item.end
+        (item) => bookingDate >= item.start && bookingDate <= item.end
       );
 
       if (weeklyDayIndex >= 0) {
