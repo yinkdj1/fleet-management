@@ -277,9 +277,38 @@ export default function StripePaymentForm({
         Your payment information is encrypted and secure.
       </p>
       
-      <Elements stripe={stripePromise} options={{ clientSecret, appearance }}>
-        <CheckoutForm amount={amount} onSuccess={onSuccess} onError={onError} onPaymentReady={onPaymentReady} />
-      </Elements>
+      <div className="space-y-3">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={async () => {
+            try {
+              const resp = await fetch(`${API_BASE_URL}/payments/create-checkout-session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount, bookingId, customerEmail }),
+              });
+
+              const data = await resp.json();
+              if (data && data.success && data.url) {
+                window.location.href = data.url;
+              } else {
+                const msg = data && data.message ? data.message : 'Failed to create checkout session';
+                onError(msg);
+              }
+            } catch (err) {
+              onError('Failed to initiate Checkout session');
+            }
+          }}
+          className="w-full rounded-md bg-emerald-700 px-4 py-2 text-white"
+        >
+          Pay with Stripe Checkout
+        </button>
+
+        <Elements stripe={stripePromise} options={{ clientSecret, appearance }}>
+          <CheckoutForm amount={amount} onSuccess={onSuccess} onError={onError} onPaymentReady={onPaymentReady} />
+        </Elements>
+      </div>
     </div>
   );
 }

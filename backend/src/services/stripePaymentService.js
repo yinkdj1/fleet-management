@@ -163,3 +163,53 @@ module.exports = {
   createSetupIntent,
   getPublishableKey,
 };
+
+/**
+ * Create a Stripe Checkout Session for a one-off payment
+ * @param {Object} params
+ * @param {number} params.amount - Amount in dollars
+ * @param {string} params.currency - Currency code
+ * @param {string} params.bookingId - Booking id for metadata
+ * @param {string} params.successUrl - Redirect URL on success
+ * @param {string} params.cancelUrl - Redirect URL on cancel
+ * @param {string} params.customerEmail - Optional customer email
+ * @returns {Promise<Object>} Checkout Session
+ */
+async function createCheckoutSession({ amount, currency = 'usd', bookingId, successUrl, cancelUrl, customerEmail }) {
+  const stripe = getStripeClient();
+
+  if (!stripe) {
+    throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY in your environment variables.');
+  }
+
+  const amountInCents = Math.round(Number(amount) * 100);
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      customer_email: customerEmail || undefined,
+      line_items: [
+        {
+          price_data: {
+            currency: currency.toLowerCase(),
+            product_data: { name: bookingId ? `Booking #${bookingId}` : 'Booking' },
+            unit_amount: amountInCents,
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: { bookingId: bookingId ? String(bookingId) : 'pending' },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+    });
+
+    return session;
+  } catch (error) {
+    console.error('Stripe Checkout Session creation failed:', error);
+    throw new Error(`Checkout Session creation failed: ${error.message}`);
+  }
+}
+
+// export new function
+module.exports.createCheckoutSession = createCheckoutSession;

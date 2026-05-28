@@ -4,6 +4,7 @@ const {
   createPaymentIntent,
   retrievePaymentIntent,
   getPublishableKey,
+  createCheckoutSession: createCheckoutSessionService,
 } = require('../services/stripePaymentService');
 
 /**
@@ -112,8 +113,44 @@ async function verifyPaymentIntent(req, res) {
   }
 }
 
+/**
+ * Create a Stripe Checkout Session and return redirect URL
+ */
+async function createCheckoutSession(req, res) {
+  try {
+    const { amount, bookingId, customerEmail, currency = 'usd' } = req.body;
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid amount is required' });
+    }
+
+    if (!isStripeConfigured()) {
+      return res.status(400).json({ success: false, message: 'Stripe is not configured' });
+    }
+
+    const origin = process.env.FRONTEND_BASE_URL || req.get('origin') || '';
+    const successUrl = `${origin}/payments/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${origin}/reserve?cancelled=1`;
+
+    const session = await createCheckoutSessionService({
+      amount: Number(amount),
+      currency,
+      bookingId,
+      successUrl,
+      cancelUrl,
+      customerEmail,
+    });
+
+    res.json({ success: true, url: session.url, id: session.id });
+  } catch (error) {
+    console.error('Create Checkout Session error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to create checkout session' });
+  }
+}
+
 module.exports = {
   getPaymentConfig,
   createBookingPaymentIntent,
   verifyPaymentIntent,
+  createCheckoutSession,
 };
