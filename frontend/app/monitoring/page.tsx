@@ -64,8 +64,11 @@ export default function MonitoringPage() {
     setProcessingFees(prev => new Set(prev).add(bookingId));
     
     try {
-      const endpoint = feeType === 'late' ? '/late-fees/charge' : '/late-fees/charge-extra-day';
-      await api.post(endpoint, { bookingId });
+      const endpoint =
+        feeType === 'late'
+          ? `/bookings/${bookingId}/charge-late-fee`
+          : `/bookings/${bookingId}/charge-extra-day-fee`;
+      await api.post(endpoint);
       
       // Refresh alerts after charging fee
       await fetchAlerts();
@@ -87,7 +90,7 @@ export default function MonitoringPage() {
     setProcessingFees(prev => new Set(prev).add(bookingId));
     
     try {
-      await api.post('/late-fees/skip', { bookingId });
+      await api.post(`/bookings/${bookingId}/skip-late-fee`);
       
       // Refresh alerts after skipping fee
       await fetchAlerts();
