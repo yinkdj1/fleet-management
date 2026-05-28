@@ -69,9 +69,6 @@ router.get("/", async (req, res, next) => {
         createdAt: {
           gte: startDate,
         },
-        status: {
-          not: "cancelled",
-        },
       },
       include: {
         vehicle: true,
