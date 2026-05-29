@@ -491,42 +491,93 @@ export default function ReportsPage() {
 
             {/* Trend chart */}
             <div className="rounded-2xl border border-amber-900/10 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
-                <h2 className="text-base font-semibold text-zinc-800">
-                  {rangeLabel} Trend
-                </h2>
-                <div className="flex rounded-lg overflow-hidden border border-amber-900/15 self-start">
-                  {(["revenue", "bookings"] as const).map((m) => (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-zinc-800">
+                      {rangeLabel} Trend
+                    </h2>
+                    <p className="text-sm text-zinc-500 mt-1">
+                      Select a range to update both charts and compare revenue or bookings across the period.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex rounded-lg overflow-hidden border border-amber-900/15">
+                      {(["revenue", "bookings"] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setChartMetric(m)}
+                          className={`px-3 py-1.5 text-xs font-medium capitalize transition ${
+                            chartMetric === m
+                              ? "bg-[var(--color-accent)] text-zinc-900"
+                              : "bg-white/70 text-zinc-600 hover:bg-white"
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
                     <button
-                      key={m}
                       type="button"
-                      onClick={() => setChartMetric(m)}
-                      className={`px-3 py-1.5 text-xs font-medium capitalize transition ${
-                        chartMetric === m
-                          ? "bg-[var(--color-accent)] text-zinc-900"
-                          : "bg-white/70 text-zinc-600 hover:bg-white"
-                      }`}
+                      onClick={() => {
+                        setSelectedTrendLabel(null);
+                        setHoveredTrendLabel(null);
+                        setSelectedVehicleIds(new Set());
+                      }}
+                      disabled={!selectedBucket && selectedVehicleIds.size === 0}
+                      className="rounded-lg border border-amber-900/20 bg-white/80 px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {m}
+                      Clear selection
                     </button>
-                  ))}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedTrendLabel(null);
-                    setHoveredTrendLabel(null);
-                    setSelectedVehicleIds(new Set());
-                  }}
-                  disabled={!selectedBucket && selectedVehicleIds.size === 0}
-                  className="self-start rounded-lg border border-amber-900/20 bg-white/80 px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Clear selection
-                </button>
+
+                <div className="space-y-2 rounded-2xl border border-amber-900/10 bg-amber-50/80 p-3">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-700">
+                    <span className="font-semibold">Vehicle filter:</span>
+                    <span className="text-zinc-500">
+                      {selectedVehicleIds.size > 0
+                        ? `${selectedVehicleIds.size} selected`
+                        : "All vehicles"}
+                    </span>
+                    {selectedVehicleIds.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVehicleIds(new Set())}
+                        className="rounded-lg border border-amber-900/15 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-white"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 overflow-hidden">
+                    {baseVehicleTable.map((vehicle) => (
+                      <button
+                        key={vehicle.vehicleId}
+                        type="button"
+                        onClick={() => toggleVehicleSelection(vehicle.vehicleId)}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                          selectedVehicleIds.has(vehicle.vehicleId)
+                            ? "border-amber-500 bg-amber-100 text-amber-900"
+                            : "border-amber-200 bg-white text-zinc-600 hover:bg-amber-50"
+                        }`}
+                      >
+                        {vehicle.make} {vehicle.model}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="grid gap-4 xl:grid-cols-2">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Bar View</p>
+
+              <div className="space-y-8">
+                <section className="rounded-2xl border border-amber-900/10 bg-white/90 p-4">
+                  <div className="flex items-center justify-between gap-4 mb-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Bar View</p>
+                      <p className="text-sm text-zinc-500">Daily/weekly/monthly revenue and booking trend bars.</p>
+                    </div>
+                  </div>
                   <BarChart
                     data={selectedTrendData}
                     metric={chartMetric}
@@ -539,11 +590,17 @@ export default function ReportsPage() {
                       setSelectedVehicleIds(new Set());
                     }}
                   />
-                </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Pie View</p>
+                </section>
+
+                <section className="rounded-2xl border border-amber-900/10 bg-white/90 p-4">
+                  <div className="flex items-center justify-between gap-4 mb-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Pie View</p>
+                      <p className="text-sm text-zinc-500">Share of bookings or revenue across the selected range.</p>
+                    </div>
+                  </div>
                   <TrendPieChart data={selectedTrendData} metric={chartMetric} />
-                </div>
+                </section>
               </div>
             </div>
 
