@@ -552,6 +552,78 @@ export default function NotificationsPage() {
             )}
           </section>
         </div>
+
+        {/* Booking Confirmation Email Sample */}
+        <section className="rounded-2xl border border-amber-900/10 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-zinc-900">Booking Confirmation Email Sample</h2>
+            <p className="text-sm text-zinc-500">This is the hardcoded template sent when a booking is confirmed.</p>
+          </div>
+
+          <div className="rounded-xl border border-amber-900/10 bg-white p-4">
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-zinc-700">Subject:</p>
+              <p className="text-sm text-zinc-600">Booking confirmation #[BOOKING_ID]</p>
+            </div>
+
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+              <p className="text-xs font-semibold text-zinc-500 mb-3">HTML Email Preview:</p>
+              <div style={{ margin: 0, padding: 24, background: '#f5f7fb', fontFamily: 'Segoe UI, Arial, sans-serif', color: '#1f2937' }}>
+                <table role="presentation" cellPadding="0" cellSpacing="0" width="100%" style={{ maxWidth: 640, margin: '0 auto', background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 14, overflow: 'hidden' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ padding: '20px 24px', background: 'linear-gradient(120deg, #0f172a, #1e293b)', color: '#ffffff' }}>
+                        <p style={{ margin: 0, fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', opacity: .9 }}>Carsgidi</p>
+                        <h1 style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.2 }}>Booking Confirmed</h1>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: 24 }}>
+                        <p style={{ margin: '0 0 12px', fontSize: 15 }}>Hello [Guest Name],</p>
+                        <p style={{ margin: '0 0 20px', fontSize: 15 }}>Your reservation is confirmed. Here are your booking details:</p>
+
+                        <table role="presentation" cellPadding="0" cellSpacing="0" width="100%" style={{ borderCollapse: 'collapse', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                          <tbody>
+                            <tr><td style={{ padding: '10px 12px', background: '#f8fafc', fontWeight: 600, width: '38%' }}>Booking ID</td><td style={{ padding: '10px 12px' }}>#123</td></tr>
+                            <tr><td style={{ padding: '10px 12px', background: '#f8fafc', fontWeight: 600 }}>Vehicle</td><td style={{ padding: '10px 12px' }}>Toyota Camry (ABC-1234)</td></tr>
+                            <tr><td style={{ padding: '10px 12px', background: '#f8fafc', fontWeight: 600 }}>Pickup</td><td style={{ padding: '10px 12px' }}>6/1/2026, 10:00 AM</td></tr>
+                            <tr><td style={{ padding: '10px 12px', background: '#f8fafc', fontWeight: 600 }}>Return</td><td style={{ padding: '10px 12px' }}>6/5/2026, 10:00 AM</td></tr>
+                            <tr><td style={{ padding: '10px 12px', background: '#f8fafc', fontWeight: 600 }}>Total</td><td style={{ padding: '10px 12px' }}>$450.00</td></tr>
+                          </tbody>
+                        </table>
+
+                        <p style={{ margin: '20px 0 12px', fontSize: 15 }}>Need to make changes?</p>
+                        <table role="presentation" cellPadding="0" cellSpacing="0" width="100%" style={{ margin: '0 0 10px' }}>
+                          <tbody>
+                            <tr>
+                              <td style={{ paddingRight: 6 }}>
+                                <a href="#" style={{ display: 'inline-block', background: '#1d4ed8', color: '#ffffff', textDecoration: 'none', padding: '11px 16px', borderRadius: 8, fontWeight: 600, fontSize: 14 }}>Modify Reservation</a>
+                              </td>
+                              <td style={{ paddingLeft: 6 }}>
+                                <a href="#" style={{ display: 'inline-block', background: '#b91c1c', color: '#ffffff', textDecoration: 'none', padding: '11px 16px', borderRadius: 8, fontWeight: 600, fontSize: 14 }}>Cancel Reservation</a>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+
+                        <p style={{ margin: '14px 0 0', fontSize: 12, color: '#6b7280' }}>If the buttons above do not work, copy and paste these links into your browser:</p>
+                        <p style={{ margin: '6px 0 0', fontSize: 12, wordBreak: 'break-all' }}>Modify: [Modify URL]</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 12, wordBreak: 'break-all' }}>Cancel: [Cancel URL]</p>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/50 p-4">
+              <p className="text-xs font-semibold text-blue-900 mb-2">Template Location:</p>
+              <p className="text-xs text-blue-800 font-mono">backend/src/services/bookingService.js</p>
+              <p className="text-xs text-blue-800 mt-1">Function: <code className="bg-blue-100 px-1 py-0.5 rounded">sendReservationConfirmationEmail()</code></p>
+              <p className="text-xs text-blue-800 mt-2">Lines: 991-1105</p>
+            </div>
+          </div>
+        </section>
       </div>
     </AppShell>
   );
