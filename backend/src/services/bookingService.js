@@ -1001,72 +1001,86 @@ async function sendReservationConfirmationEmail(booking) {
 
   const links = buildGuestManageLinks(booking);
 
-  const guestFirstName = escapeHtml(booking.customer?.firstName || "Guest");
-  const vehicleLabel = escapeHtml(
-    `${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""}`.trim()
-  );
-  const plateNumber = escapeHtml(booking.vehicle?.plateNumber || "N/A");
-  const pickupDisplay = escapeHtml(formatDateTimeForEmail(booking.pickupDatetime));
-  const returnDisplay = escapeHtml(formatDateTimeForEmail(booking.returnDatetime));
-  const totalDisplay = Number(booking.totalAmount || 0).toFixed(2);
+  // Check for custom email template for booking_created
+  const emailTemplate = await getActiveTemplate("booking_created", "email");
+  
+  let subject, html, text;
+  
+  if (emailTemplate) {
+    // Use custom template
+    subject = renderSmsTemplate(emailTemplate.subject, booking, links);
+    const bodyText = renderSmsTemplate(emailTemplate.body, booking, links);
+    html = `<p>${bodyText.replace(/\n/g, '<br>')}</p>`;
+    text = bodyText;
+  } else {
+    // Fallback to default hardcoded template
+    const guestFirstName = escapeHtml(booking.customer?.firstName || "Guest");
+    const vehicleLabel = escapeHtml(
+      `${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""}`.trim()
+    );
+    const plateNumber = escapeHtml(booking.vehicle?.plateNumber || "N/A");
+    const pickupDisplay = escapeHtml(formatDateTimeForEmail(booking.pickupDatetime));
+    const returnDisplay = escapeHtml(formatDateTimeForEmail(booking.returnDatetime));
+    const totalDisplay = Number(booking.totalAmount || 0).toFixed(2);
 
-  const subject = `Booking confirmation #${booking.id}`;
-  const html = `
-    <div style="margin:0;padding:24px;background:#f5f7fb;font-family:Segoe UI,Arial,sans-serif;color:#1f2937;">
-      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
-        <tr>
-          <td style="padding:20px 24px;background:linear-gradient(120deg,#0f172a,#1e293b);color:#ffffff;">
-            <p style="margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">Carsgidi</p>
-            <h1 style="margin:6px 0 0;font-size:24px;line-height:1.2;">Booking Confirmed</h1>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:24px;">
-            <p style="margin:0 0 12px;font-size:15px;">Hello ${guestFirstName},</p>
-            <p style="margin:0 0 20px;font-size:15px;">Your reservation is confirmed. Here are your booking details:</p>
+    subject = `Booking confirmation #${booking.id}`;
+    html = `
+      <div style="margin:0;padding:24px;background:#f5f7fb;font-family:Segoe UI,Arial,sans-serif;color:#1f2937;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+          <tr>
+            <td style="padding:20px 24px;background:linear-gradient(120deg,#0f172a,#1e293b);color:#ffffff;">
+              <p style="margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">Carsgidi</p>
+              <h1 style="margin:6px 0 0;font-size:24px;line-height:1.2;">Booking Confirmed</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px;">
+              <p style="margin:0 0 12px;font-size:15px;">Hello ${guestFirstName},</p>
+              <p style="margin:0 0 20px;font-size:15px;">Your reservation is confirmed. Here are your booking details:</p>
 
-            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
-              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;width:38%;">Booking ID</td><td style="padding:10px 12px;">#${booking.id}</td></tr>
-              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Vehicle</td><td style="padding:10px 12px;">${vehicleLabel} (${plateNumber})</td></tr>
-              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Pickup</td><td style="padding:10px 12px;">${pickupDisplay}</td></tr>
-              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Return</td><td style="padding:10px 12px;">${returnDisplay}</td></tr>
-              <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Total</td><td style="padding:10px 12px;">$${totalDisplay}</td></tr>
-            </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+                <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;width:38%;">Booking ID</td><td style="padding:10px 12px;">#${booking.id}</td></tr>
+                <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Vehicle</td><td style="padding:10px 12px;">${vehicleLabel} (${plateNumber})</td></tr>
+                <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Pickup</td><td style="padding:10px 12px;">${pickupDisplay}</td></tr>
+                <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Return</td><td style="padding:10px 12px;">${returnDisplay}</td></tr>
+                <tr><td style="padding:10px 12px;background:#f8fafc;font-weight:600;">Total</td><td style="padding:10px 12px;">$${totalDisplay}</td></tr>
+              </table>
 
-            <p style="margin:20px 0 12px;font-size:15px;">Need to make changes?</p>
-            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 10px;">
-              <tr>
-                <td style="padding-right:6px;">
-                  <a href="${links.modifyUrl}" style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;padding:11px 16px;border-radius:8px;font-weight:600;font-size:14px;">Modify Reservation</a>
-                </td>
-                <td style="padding-left:6px;">
-                  <a href="${links.cancelUrl}" style="display:inline-block;background:#b91c1c;color:#ffffff;text-decoration:none;padding:11px 16px;border-radius:8px;font-weight:600;font-size:14px;">Cancel Reservation</a>
-                </td>
-              </tr>
-            </table>
+              <p style="margin:20px 0 12px;font-size:15px;">Need to make changes?</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 10px;">
+                <tr>
+                  <td style="padding-right:6px;">
+                    <a href="${links.modifyUrl}" style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;padding:11px 16px;border-radius:8px;font-weight:600;font-size:14px;">Modify Reservation</a>
+                  </td>
+                  <td style="padding-left:6px;">
+                    <a href="${links.cancelUrl}" style="display:inline-block;background:#b91c1c;color:#ffffff;text-decoration:none;padding:11px 16px;border-radius:8px;font-weight:600;font-size:14px;">Cancel Reservation</a>
+                  </td>
+                </tr>
+              </table>
 
-            <p style="margin:14px 0 0;font-size:12px;color:#6b7280;">If the buttons above do not work, copy and paste these links into your browser:</p>
-            <p style="margin:6px 0 0;font-size:12px;word-break:break-all;">Modify: ${escapeHtml(links.modifyUrl)}</p>
-            <p style="margin:4px 0 0;font-size:12px;word-break:break-all;">Cancel: ${escapeHtml(links.cancelUrl)}</p>
-          </td>
-        </tr>
-      </table>
-    </div>
-  `;
+              <p style="margin:14px 0 0;font-size:12px;color:#6b7280;">If the buttons above do not work, copy and paste these links into your browser:</p>
+              <p style="margin:6px 0 0;font-size:12px;word-break:break-all;">Modify: ${escapeHtml(links.modifyUrl)}</p>
+              <p style="margin:4px 0 0;font-size:12px;word-break:break-all;">Cancel: ${escapeHtml(links.cancelUrl)}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
 
-  const text = [
-    `Hello ${booking.customer?.firstName || "Guest"},`,
-    "",
-    "Your reservation is confirmed.",
-    `Booking ID: #${booking.id}`,
-    `Vehicle: ${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""} (${booking.vehicle?.plateNumber || "N/A"})`,
-    `Pickup: ${formatDateTimeForEmail(booking.pickupDatetime)}`,
-    `Return: ${formatDateTimeForEmail(booking.returnDatetime)}`,
-    `Total: $${totalDisplay}`,
-    "",
-    `Modify Reservation: ${links.modifyUrl}`,
-    `Cancel Reservation: ${links.cancelUrl}`,
-  ].join("\n");
+    text = [
+      `Hello ${booking.customer?.firstName || "Guest"},`,
+      "",
+      "Your reservation is confirmed.",
+      `Booking ID: #${booking.id}`,
+      `Vehicle: ${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""} (${booking.vehicle?.plateNumber || "N/A"})`,
+      `Pickup: ${formatDateTimeForEmail(booking.pickupDatetime)}`,
+      `Return: ${formatDateTimeForEmail(booking.returnDatetime)}`,
+      `Total: $${totalDisplay}`,
+      "",
+      `Modify Reservation: ${links.modifyUrl}`,
+      `Cancel Reservation: ${links.cancelUrl}`,
+    ].join("\n");
+  }
 
   if (!hasSmtpConfig()) {
     return {
