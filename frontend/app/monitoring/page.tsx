@@ -8,6 +8,9 @@ interface TripAlert {
   type: string;
   message: string;
   hoursOverdue?: number;
+  lateDays?: number;
+  dailyRate?: number;
+  cumulativeLateFee?: number;
   lateFeeStatus?: string | null;
   extraDayFeeStatus?: string | null;
   amountDue?: number;
@@ -135,9 +138,24 @@ export default function MonitoringPage() {
                             {alert.hoursOverdue} hours overdue
                           </div>
                         )}
+                        {typeof alert.lateDays === 'number' && alert.lateDays > 0 && (
+                          <div className="text-sm text-orange-600 font-medium mt-1">
+                            {alert.lateDays} day{alert.lateDays !== 1 ? 's' : ''} late
+                          </div>
+                        )}
+                        {typeof alert.cumulativeLateFee === 'number' && alert.cumulativeLateFee > 0 && (
+                          <div className="text-sm text-red-700 font-semibold mt-1">
+                            Cumulative late fee: ${alert.cumulativeLateFee.toFixed(2)}
+                            {typeof alert.dailyRate === 'number' && (
+                              <span className="text-xs text-zinc-600 font-normal ml-1">
+                                (${alert.dailyRate.toFixed(2)}/day × {alert.lateDays} day{alert.lateDays !== 1 ? 's' : ''})
+                              </span>
+                            )}
+                          </div>
+                        )}
                         {typeof alert.amountDue === 'number' && (
-                          <div className="text-sm text-zinc-700 mt-1">
-                            Amount due: ${alert.amountDue.toFixed(2)}
+                          <div className="text-sm text-zinc-900 font-bold mt-2 pt-2 border-t border-yellow-200">
+                            Total amount due: ${alert.amountDue.toFixed(2)}
                           </div>
                         )}
                       </>

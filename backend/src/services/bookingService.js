@@ -251,7 +251,19 @@ function getJwtSecret() {
 }
 
 function getFrontendBaseUrl() {
-  return (process.env.FRONTEND_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
+  const nodeEnv = (process.env.NODE_ENV || "development").toLowerCase();
+  
+  let url;
+  if (nodeEnv === "production") {
+    url = process.env.FRONTEND_BASE_URL_PROD || "https://www.carsgidi.com";
+  } else if (nodeEnv === "development") {
+    url = process.env.FRONTEND_BASE_URL_DEV || "http://localhost:3000";
+  } else {
+    // staging, test, or any other non-production environment
+    url = process.env.FRONTEND_BASE_URL_NONPROD || "https://www.fleet-management-b5xnq3psj-yinkdj1s-projects.vercel.app";
+  }
+  
+  return url.replace(/\/$/, "");
 }
 
 function formatDateTimeForEmail(value) {
@@ -313,6 +325,10 @@ function renderSmsTemplate(body, booking, links) {
     modifyUrl: links?.modifyUrl || "",
     cancelUrl: links?.cancelUrl || "",
     supportPhone,
+    // Late return specific fields
+    lateDays: String(booking.lateDays || 0),
+    cumulativeLateFee: `$${Number(booking.cumulativeLateFee || 0).toFixed(2)}`,
+    totalAmountDue: `$${Number(booking.totalAmountDue || booking.totalAmount || 0).toFixed(2)}`,
   };
 
   return body.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");

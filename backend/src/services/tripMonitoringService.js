@@ -79,14 +79,26 @@ async function monitorTrips() {
         extraDayFeeStatus = "charged";
       }
       
+      // Calculate cumulative daily rental fee for late days
+      const returnDate = new Date(booking.returnDatetime);
+      const lateDays = Math.floor((now - returnDate) / (1000 * 60 * 60 * 24));
+      const dailyRate = booking.vehicle?.dailyRate || 0;
+      const cumulativeLateFee = lateDays * dailyRate;
+      
+      // Total amount due includes original booking total plus cumulative late fees
+      const totalAmountDue = Number(booking.totalAmount || 0) + cumulativeLateFee;
+      
       alerts.push({
         bookingId: booking.id,
         type: "overdue",
         message: `Booking ${booking.id} is overdue for return.`,
         hoursOverdue: Math.floor(hoursOverdue),
+        lateDays,
+        dailyRate,
+        cumulativeLateFee,
         lateFeeStatus,
         extraDayFeeStatus,
-        amountDue: Number(booking.totalAmount || 0),
+        amountDue: totalAmountDue,
         booking, // Include full booking data for frontend
       });
 
