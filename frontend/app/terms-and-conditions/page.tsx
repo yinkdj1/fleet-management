@@ -279,7 +279,64 @@ export default function TermsAndConditionsPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-zinc-900 mb-4">18. Contact Information</h2>
+            <h2 className="text-2xl font-semibold text-zinc-900 mb-4">18. SMS/Text Messaging Program</h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-zinc-800 mb-2">Program Description</h3>
+                <p className="leading-relaxed">
+                  Carsgidi offers an SMS/text messaging program to send you important notifications about your vehicle rental, including:
+                </p>
+                <ul className="list-disc pl-6 space-y-1 mt-2">
+                  <li>Booking confirmations and reminders</li>
+                  <li>Pickup and return notifications</li>
+                  <li>Vehicle status updates</li>
+                  <li>Late return alerts</li>
+                  <li>Payment confirmations</li>
+                  <li>Customer service messages</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-zinc-800 mb-2">Message Frequency</h3>
+                <p className="leading-relaxed">
+                  Message frequency varies based on your rental activity. You may receive up to 10 messages per rental, including booking confirmation, pickup reminders, midway check-ins, return reminders, and payment notifications.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-zinc-800 mb-2">Message and Data Rates</h3>
+                <p className="leading-relaxed">
+                  <strong>Message and data rates may apply.</strong> Standard text messaging rates from your mobile carrier will apply to all SMS messages sent and received. Please contact your mobile carrier for details about your messaging plan.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-zinc-800 mb-2">How to Get Help</h3>
+                <p className="leading-relaxed">
+                  For help with SMS messages, text <strong>HELP</strong> to the number from which you received the message, or contact us at:
+                </p>
+                <ul className="list-disc pl-6 space-y-1 mt-2">
+                  <li>Email: <a href="mailto:support@carsgidi.com" className="text-blue-600 hover:underline">support@carsgidi.com</a></li>
+                  <li>Phone: <a href="tel:+14702382358" className="text-blue-600 hover:underline">+1 (470) 238-2358</a></li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-zinc-800 mb-2">How to Stop Messages</h3>
+                <p className="leading-relaxed">
+                  To stop receiving SMS messages from Carsgidi, text <strong>STOP</strong> to the number from which you received the message. After texting STOP, you will receive one final confirmation message. You may also opt out by contacting customer support.
+                </p>
+                <p className="leading-relaxed mt-2">
+                  <strong>Important:</strong> Opting out of SMS messages may affect your ability to receive important booking updates and notifications. You will still receive critical messages related to active reservations.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-zinc-800 mb-2">Supported Carriers</h3>
+                <p className="leading-relaxed">
+                  Our SMS program is supported by all major U.S. carriers including AT&T, T-Mobile, Verizon, Sprint, and others. Carrier message and data rates may apply.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-zinc-900 mb-4">19. Contact Information</h2>
             <p className="leading-relaxed mb-2">
               For questions about these Terms and Conditions, please contact us:
             </p>
@@ -288,6 +345,7 @@ export default function TermsAndConditionsPage() {
               <p>Email: <a href="mailto:support@carsgidi.com" className="text-blue-600 hover:underline">support@carsgidi.com</a></p>
               <p>Phone: <a href="tel:+14702382358" className="text-blue-600 hover:underline">+1 (470) 238-2358</a></p>
               <p>Legal: <a href="mailto:legal@carsgidi.com" className="text-blue-600 hover:underline">legal@carsgidi.com</a></p>
+              <p>SMS Support: Text <strong>HELP</strong> or <strong>STOP</strong> to any message</p>
             </div>
           </section>
         </div>
