@@ -12,7 +12,6 @@ const PROTECTED_PREFIXES = [
   "/notifications",
   "/coupon",
   "/admin",
-  "/guest-manage",
 ];
 
 export function middleware(request: NextRequest) {
@@ -45,6 +44,5 @@ export const config = {
     "/notifications/:path*",
     "/coupon/:path*",
     "/admin/:path*",
-    "/guest-manage/:path*",
   ],
 };
