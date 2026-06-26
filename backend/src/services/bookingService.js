@@ -243,6 +243,13 @@ function buildAppError(message, statusCode = 400, errors = null) {
   return error;
 }
 
+function getSupportContactDetails() {
+  return {
+    supportEmail: process.env.SUPPORT_EMAIL || "support@carsgidi.com",
+    supportPhone: process.env.SUPPORT_PHONE || "+1 (470) 238-2358",
+  };
+}
+
 function getJwtSecret() {
   if (!process.env.JWT_SECRET) {
     throw buildAppError("JWT secret is not configured", 500);
@@ -1437,9 +1444,15 @@ async function getBookingByManageToken(token) {
   }
 
   if (isWithinGuestManageCutoff(booking.pickupDatetime)) {
+    const { supportEmail, supportPhone } = getSupportContactDetails();
     throw buildAppError(
-      "Modify and cancel links are no longer available within 24 hours of pickup",
-      403
+      "Reservations within 24 hours of pickup cannot be modified or cancelled online. Please contact support for assistance.",
+      403,
+      {
+        contactSupport: true,
+        supportEmail,
+        supportPhone,
+      }
     );
   }
 
