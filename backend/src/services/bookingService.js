@@ -1375,7 +1375,7 @@ async function createPublicReservationDraft(data) {
     pickupDatetime: data.pickupDatetime,
     returnDatetime: data.returnDatetime,
     status: "draft",
-    paymentStatus: data.paymentStatus || "paid",
+    paymentStatus: data.paymentStatus || "unpaid",
   });
 
   return {
@@ -1403,7 +1403,7 @@ async function createPublicReservationIdentitySession(data = {}) {
   };
 }
 
-async function finalizePublicReservation(bookingId) {
+async function finalizePublicReservation(bookingId, data = {}) {
   const existingBooking = await prisma.booking.findUnique({
     where: { id: Number(bookingId) },
     include: {
@@ -1438,6 +1438,7 @@ async function finalizePublicReservation(bookingId) {
     where: { id: Number(bookingId) },
     data: {
       status: "reserved",
+      paymentStatus: data.paymentStatus || "paid",
     },
     include: {
       customer: true,

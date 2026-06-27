@@ -623,6 +623,8 @@ export default function ReservePage() {
   const vehicleRequestIdRef = useRef(0);
   const addressRequestIdRef = useRef(0);
   const confirmPaymentRef = useRef<(() => Promise<void>) | null>(null);
+  const [identityVerificationComplete, setIdentityVerificationComplete] = useState(false);
+  const [pendingIdentityBookingId, setPendingIdentityBookingId] = useState<number | null>(null);
   const [maxDateOfBirth, setMaxDateOfBirth] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
@@ -638,61 +640,11 @@ export default function ReservePage() {
     const identityStatus = searchParams.get("identity");
 
     if (identityStatus === "done" && bookingId) {
-      const finalizeReservation = async () => {
-        try {
-          setSubmitting(true);
-          const res = await api.post(`/public/reservations/${bookingId}/finalize-identity`);
-          const reservation = res.data?.data || null;
-          const bookingIdFromResponse = reservation?.id;
-          const confirmationEmailMessage = reservation?.confirmationEmail?.message;
-          const confirmationSmsMessage = reservation?.confirmationSms?.message;
-          const confirmationEmailLinks = reservation?.confirmationEmail?.links;
-          const confirmationSmsLinks = reservation?.confirmationSms?.links;
-          const manageToken =
-            confirmationEmailLinks?.token ||
-            confirmationSmsLinks?.token ||
-            extractManageTokenFromUrl(confirmationEmailLinks?.manageUrl) ||
-            extractManageTokenFromUrl(confirmationEmailLinks?.modifyUrl) ||
-            extractManageTokenFromUrl(confirmationEmailLinks?.cancelUrl) ||
-            extractManageTokenFromUrl(confirmationSmsLinks?.manageUrl) ||
-            extractManageTokenFromUrl(confirmationSmsLinks?.modifyUrl) ||
-            extractManageTokenFromUrl(confirmationSmsLinks?.cancelUrl) ||
-            (reservation?.manageToken as string | undefined);
-          const deletionToken = reservation?.deletionToken as string | undefined;
-
-          if (bookingIdFromResponse) {
-            setConfirmationDetails({
-              bookingId: bookingIdFromResponse,
-              firstName: reservation.customer?.firstName || "",
-              lastName: reservation.customer?.lastName || "",
-              vehicleMake: reservation.vehicle?.make || "",
-              vehicleModel: reservation.vehicle?.model || "",
-              vehiclePlate: reservation.vehicle?.plateNumber || "",
-              pickupDatetime: reservation.pickupDatetime,
-              returnDatetime: reservation.returnDatetime,
-              pickupLocation,
-              total: Number(reservation.totalAmount || 0),
-              paymentReference: "",
-              emailMessage: confirmationEmailMessage,
-              smsMessage: confirmationSmsMessage,
-              deletionToken,
-              manageToken,
-            });
-          }
-        } catch (err: unknown) {
-          setError(
-            getApiErrorMessage(
-              err,
-              "Identity verification was not completed successfully, so your booking cannot be confirmed yet."
-            )
-          );
-        } finally {
-          setSubmitting(false);
-          router.replace("/reserve");
-        }
-      };
-
-      finalizeReservation();
+      setIdentityVerificationComplete(true);
+      setPendingIdentityBookingId(Number(bookingId));
+      setPaymentMessage("Identity verified. Complete payment to confirm your reservation.");
+      setError("");
+      router.replace("/reserve");
     }
   }, [pickupLocation, router, searchParams]);
 
@@ -1259,19 +1211,114 @@ export default function ReservePage() {
     }
   };
 
-  const handleStripePaymentSuccess = (paymentIntentId: string) => {
-    setForm((prev) => ({
-      ...prev,
-      paymentReference: paymentIntentId,
-      paymentConfirmed: true,
-    }));
-    setPaymentMessage(`Payment confirmed. Reference: ${paymentIntentId}`);
-    setFieldErrors((prev) => ({
-      ...prev,
-      paymentReference: "",
-      paymentConfirmed: "",
-      paymentStatus: "",
-    }));
+  const handleStripePaymentSuccess = async (paymentIntentId: string) => {
+    if (!pendingIdentityBookingId) {
+      setError("Identity verification must be completed before payment can be processed.");
+      setFieldErrors((prev) => ({
+        ...prev,
+        paymentStatus: "Identity verification must be completed before payment can be processed.",
+      }));
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setForm((prev) => ({
+        ...prev,
+        paymentReference: paymentIntentId,
+        paymentConfirmed: true,
+      }));
+      setPaymentMessage("Payment confirmed. Finalizing your reservation...");
+      setFieldErrors((prev) => ({
+        ...prev,
+        paymentReference: "",
+        paymentConfirmed: "",
+        paymentStatus: "",
+      }));
+
+      const res = await api.post(`/public/reservations/${pendingIdentityBookingId}/finalize-identity`, {
+        paymentStatus: "paid",
+      });
+      const reservation = res.data?.data || null;
+      const bookingIdFromResponse = reservation?.id;
+      const confirmationEmailMessage = reservation?.confirmationEmail?.message;
+      const confirmationSmsMessage = reservation?.confirmationSms?.message;
+      const confirmationEmailLinks = reservation?.confirmationEmail?.links;
+      const confirmationSmsLinks = reservation?.confirmationSms?.links;
+      const manageToken =
+        confirmationEmailLinks?.token ||
+        confirmationSmsLinks?.token ||
+        extractManageTokenFromUrl(confirmationEmailLinks?.manageUrl) ||
+        extractManageTokenFromUrl(confirmationEmailLinks?.modifyUrl) ||
+        extractManageTokenFromUrl(confirmationEmailLinks?.cancelUrl) ||
+        extractManageTokenFromUrl(confirmationSmsLinks?.manageUrl) ||
+        extractManageTokenFromUrl(confirmationSmsLinks?.modifyUrl) ||
+        extractManageTokenFromUrl(confirmationSmsLinks?.cancelUrl) ||
+        (reservation?.manageToken as string | undefined);
+      const deletionToken = reservation?.deletionToken as string | undefined;
+
+      if (bookingIdFromResponse) {
+        setConfirmationDetails({
+          bookingId: bookingIdFromResponse,
+          firstName: reservation.customer?.firstName || form.firstName.trim(),
+          lastName: reservation.customer?.lastName || form.lastName.trim(),
+          vehicleMake: reservation.vehicle?.make || selectedVehicle?.make || "",
+          vehicleModel: reservation.vehicle?.model || selectedVehicle?.model || "",
+          vehiclePlate: reservation.vehicle?.plateNumber || selectedVehicle?.plateNumber || "",
+          pickupDatetime: reservation.pickupDatetime || form.pickupDatetime,
+          returnDatetime: reservation.returnDatetime || form.returnDatetime,
+          pickupLocation,
+          total: Number(reservation.totalAmount || pricePreview?.total || 0),
+          paymentReference: paymentIntentId,
+          emailMessage: confirmationEmailMessage,
+          smsMessage: confirmationSmsMessage,
+          deletionToken,
+          manageToken,
+        });
+      }
+
+      setForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        addressLine: "",
+        city: "",
+        state: "",
+        zip: "",
+        driversLicenseNo: "",
+        dateOfBirth: "",
+        pickupDatetime: "",
+        returnDatetime: "",
+        vehicleId: "",
+        paymentReference: "",
+        paymentConfirmed: false,
+      });
+      setPaymentForm({
+        cardholderName: "",
+        cardNumber: "",
+        expiry: "",
+        cvv: "",
+      });
+      setTermsChecks({
+        accuracy: false,
+        agreement: false,
+        authorization: false,
+        esign: false,
+      });
+      setLookupMessage("");
+      setPaymentMessage(`Payment confirmed. Reference: ${paymentIntentId}`);
+      setIdentityVerificationComplete(false);
+      setPendingIdentityBookingId(null);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Your payment was processed, but the booking could not be confirmed yet."));
+      setFieldErrors((prev) => ({
+        ...prev,
+        paymentStatus: "Your payment was processed, but the booking could not be confirmed yet.",
+      }));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleStripePaymentError = (error: string) => {
@@ -1480,16 +1527,6 @@ export default function ReservePage() {
       return;
     }
 
-    // Trigger Stripe payment before submitting reservation
-    if (confirmPaymentRef.current) {
-      try {
-        await confirmPaymentRef.current();
-      } catch (paymentError) {
-        // Payment failed, error already handled by handleStripePaymentError
-        return;
-      }
-    }
-
     try {
       setSubmitting(true);
 
@@ -1509,7 +1546,7 @@ export default function ReservePage() {
         vehicleId: Number(form.vehicleId),
         pickupDatetime: new Date(form.pickupDatetime).toISOString(),
         returnDatetime: new Date(form.returnDatetime).toISOString(),
-        paymentStatus: "paid",
+        paymentStatus: "unpaid",
         paymentReference: form.paymentReference.trim(),
         returnUrl: `${window.location.origin}/reserve?identity=done`,
       });
@@ -2473,6 +2510,11 @@ export default function ReservePage() {
                     className="md:col-span-2 xl:col-span-4 animate-stagger"
                     style={{ "--anim-delay": "140ms" } as React.CSSProperties}
                   >
+<div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                      {identityVerificationComplete
+                        ? "Identity verification is complete. Complete payment below to confirm your reservation."
+                        : "Identity verification is required before payment and booking confirmation can proceed."}
+                    </div>
                     <StripePaymentForm
                       amount={pricePreview?.total || 0}
                       onSuccess={handleStripePaymentSuccess}
@@ -2480,7 +2522,7 @@ export default function ReservePage() {
                       onPaymentReady={handlePaymentReady}
                       customerEmail={form.email}
                       customerName={`${form.firstName} ${form.lastName}`.trim()}
-                      disabled={!pricePreview || !form.firstName || !form.lastName || !form.email}
+                      disabled={!identityVerificationComplete || !pricePreview || !form.firstName || !form.lastName || !form.email}
                     />
 
                     {paymentMessage && (
@@ -2643,14 +2685,13 @@ export default function ReservePage() {
                       !selectedVehicle ||
                       !form.pickupDatetime ||
                       !form.returnDatetime ||
-                      !pricePreview ||
-                      !confirmPaymentRef.current
+                      !pricePreview
                     }
                     className="attention-bounce md:col-span-2 xl:col-span-4 w-full rounded-xl bg-[#2f66e8] px-4 py-3 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2257d6] disabled:opacity-60"
                   >
                     {submitting
-                      ? "Processing Payment & Reservation..."
-                      : "Confirm Reservation"}
+                      ? "Processing Identity Verification..."
+                      : "Continue to Identity Verification"}
                   </button>
                 </>
               )}

@@ -375,7 +375,7 @@ async function createPublicReservationIdentitySession(req, res, next) {
 
 async function finalizePublicReservation(req, res, next) {
   try {
-    const reservation = await bookingService.finalizePublicReservation(req.params.id);
+    const reservation = await bookingService.finalizePublicReservation(req.params.id, req.body);
     res.json({ data: reservation });
   } catch (error) {
     next(error);
