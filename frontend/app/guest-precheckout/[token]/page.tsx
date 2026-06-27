@@ -4,11 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import api from "../../../lib/api";
 import { formatBookingId } from "../../../lib/bookingId";
-import { loadStripe } from "@stripe/stripe-js";
-
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
-);
 
 type BookingInfo = {
   id: number;
@@ -24,6 +19,7 @@ type BookingInfo = {
     model?: string;
     plateNumber?: string;
   };
+  identityVerified?: boolean;
   documents?: Array<{
     id: number;
     documentType: string;
@@ -37,6 +33,19 @@ type UploadState = {
   fileUrl: string;
   error: string;
 };
+
+type IdentityDocument = {
+  documentType?: string;
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (error as { response?: { data?: { message?: string } } }).response?.data;
+    return response?.message || fallback;
+  }
+
+  return fallback;
+}
 
 const EMPTY_UPLOAD_STATE: UploadState = {
   uploading: false,
@@ -63,8 +72,6 @@ export default function GuestPrecheckoutPage() {
 
   // Stripe Identity state
   const [identityVerified, setIdentityVerified] = useState(false);
-  const [identityLoading, setIdentityLoading] = useState(false);
-  const [identityError, setIdentityError] = useState("");
 
   const loadBooking = async () => {
     try {
@@ -83,6 +90,7 @@ export default function GuestPrecheckoutPage() {
       const identityDoc = data?.documents?.find(
         (doc) => doc.documentType === "stripe_identity_verified"
       );
+      const identityVerifiedFromApi = Boolean(data?.identityVerified ?? identityDoc);
 
       setLicenseUpload((prev) => ({
         ...prev,
@@ -96,9 +104,9 @@ export default function GuestPrecheckoutPage() {
         fileUrl: selfieDoc?.fileUrl || "",
       }));
 
-      setIdentityVerified(Boolean(identityDoc));
-    } catch (err: any) {
-      setError(err.response?.data?.message || "This pre-checkout link is invalid or expired.");
+      setIdentityVerified(identityVerifiedFromApi);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "This pre-checkout link is invalid or expired."));
     } finally {
       setLoading(false);
     }
@@ -116,7 +124,11 @@ export default function GuestPrecheckoutPage() {
       const poll = setInterval(async () => {
         const res = await api.get(`/public/precheckout/${token}`).catch(() => null);
         const docs = res?.data?.data?.documents || [];
-        if (docs.find((d: any) => d.documentType === "stripe_identity_verified")) {
+        const identityVerifiedFromPoll = Boolean(
+          res?.data?.data?.identityVerified ||
+            docs.find((d: IdentityDocument) => d.documentType === "stripe_identity_verified")
+        );
+        if (identityVerifiedFromPoll) {
           setIdentityVerified(true);
           clearInterval(poll);
         }
@@ -125,26 +137,6 @@ export default function GuestPrecheckoutPage() {
       setTimeout(() => clearInterval(poll), 30000);
     }
   }, [searchParams, token]);
-
-  const startIdentityVerification = async () => {
-    setIdentityLoading(true);
-    setIdentityError("");
-    try {
-      const res = await api.post(`/public/precheckout/${token}/identity-session`, {
-        returnUrl: window.location.href.split("?")[0] + "?identity=done",
-      });
-      const { url } = res.data?.data || {};
-      if (url) {
-        window.location.href = url;
-      } else {
-        setIdentityError("Could not start verification. Please try again.");
-      }
-    } catch (err: any) {
-      setIdentityError(err.response?.data?.message || "Verification failed. Please try again.");
-    } finally {
-      setIdentityLoading(false);
-    }
-  };
 
   const uploadPhoto = async (file: File, documentType: "license" | "selfie") => {
     const setState = documentType === "license" ? setLicenseUpload : setSelfieUpload;
@@ -165,12 +157,12 @@ export default function GuestPrecheckoutPage() {
         fileUrl: uploadedUrl,
         error: "",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setState({
         uploading: false,
         done: false,
         fileUrl: "",
-        error: err.response?.data?.message || "Upload failed. Please try again.",
+        error: getErrorMessage(err, "Upload failed. Please try again."),
       });
     }
   };
@@ -233,30 +225,11 @@ export default function GuestPrecheckoutPage() {
                 </svg>
                 <p className="text-sm font-medium text-green-800">Identity verified successfully</p>
               </div>
-            ) : searchParams.get("identity") === "done" ? (
-              <div className="rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3">
-                <p className="text-sm text-yellow-800">Waiting for verification result...</p>
-              </div>
             ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-zinc-600">
-                  We use Stripe Identity to securely verify your driver's license. Your data is encrypted and handled by Stripe.
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="text-sm text-emerald-800">
+                  Identity verification is handled earlier in the booking flow before your reservation is confirmed.
                 </p>
-                <ul className="text-sm text-zinc-600 space-y-1 list-disc list-inside">
-                  <li>Take a photo of your driver's license</li>
-                  <li>Take a selfie for liveness check</li>
-                  <li>Results are instant</li>
-                </ul>
-                {identityError && (
-                  <p className="text-sm text-red-600">{identityError}</p>
-                )}
-                <button
-                  onClick={startIdentityVerification}
-                  disabled={identityLoading}
-                  className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-400 text-white py-3 text-sm font-semibold transition-colors"
-                >
-                  {identityLoading ? "Starting verification..." : "Verify My Identity"}
-                </button>
               </div>
             )}
           </section>

@@ -206,6 +206,7 @@ const { hasSmtpConfig, sendEmail } = require("./emailService");
 const { getDiscountSettings } = require("./discountSettingsService");
 const { listNotificationTemplates } = require("./notificationTemplateService");
 const { calculateDynamicPrice } = require("./dynamicPricingService");
+const { createIdentitySession, isBookingIdentityVerified } = require("./stripeIdentityService");
 const twilio = require("twilio");
 
 const PRECHECKOUT_AUTO_MARKER_TYPE = "precheckout_prompt_auto_sent";
@@ -700,6 +701,7 @@ async function getBookings(filters = {}) {
         vehicle: true,
         checkout: CHECKOUT_SAFE_INCLUDE,
         checkin: CHECKIN_SAFE_INCLUDE,
+        documents: true,
       },
       orderBy: {
         id: "desc",
@@ -1362,6 +1364,117 @@ async function sendReservationCancellationEmail(booking) {
   }
 }
 
+async function createPublicReservationDraft(data) {
+  validatePublicReservationPayload(data);
+
+  const customer = await findOrCreatePublicCustomer(data.customer || {});
+
+  const booking = await createBooking({
+    customerId: customer.id,
+    vehicleId: data.vehicleId,
+    pickupDatetime: data.pickupDatetime,
+    returnDatetime: data.returnDatetime,
+    status: "draft",
+    paymentStatus: data.paymentStatus || "paid",
+  });
+
+  return {
+    ...booking,
+    identityRequired: true,
+  };
+}
+
+async function createPublicReservationIdentitySession(data = {}) {
+  const booking = await createPublicReservationDraft(data);
+
+  const baseUrl = String(
+    data.returnUrl ||
+      `${process.env.FRONTEND_URL || "https://fleet-management-bay-ten.vercel.app"}/reserve?identity=done`
+  ).trim();
+  const returnUrl = new URL(baseUrl, process.env.FRONTEND_URL || "https://fleet-management-bay-ten.vercel.app");
+  returnUrl.searchParams.set("bookingId", String(booking.id));
+
+  const identitySession = await createIdentitySession(booking.id, returnUrl.toString());
+
+  return {
+    bookingId: booking.id,
+    booking,
+    identitySession,
+  };
+}
+
+async function finalizePublicReservation(bookingId) {
+  const existingBooking = await prisma.booking.findUnique({
+    where: { id: Number(bookingId) },
+    include: {
+      customer: true,
+      vehicle: true,
+    },
+  });
+
+  if (!existingBooking) {
+    throw buildAppError("Booking not found", 404);
+  }
+
+  if (existingBooking.status !== "draft") {
+    return {
+      ...existingBooking,
+      identityVerified: await isBookingIdentityVerified(existingBooking.id),
+    };
+  }
+
+  const identityVerified = await isBookingIdentityVerified(existingBooking.id);
+  if (!identityVerified) {
+    throw buildAppError(
+      "Identity verification was not completed successfully, so this booking cannot be confirmed yet.",
+      409,
+      {
+        identityVerificationRequired: true,
+      }
+    );
+  }
+
+  const booking = await prisma.booking.update({
+    where: { id: Number(bookingId) },
+    data: {
+      status: "reserved",
+    },
+    include: {
+      customer: true,
+      vehicle: true,
+    },
+  });
+
+  await syncVehicleStatusOnBookingStatusChange(booking.vehicleId, booking.status);
+
+  const emailResult = await sendReservationConfirmationEmail(booking).catch((err) => {
+    console.error("Failed to send confirmation email:", err?.message || err);
+    return {
+      sent: false,
+      reason: err?.code || "email_error",
+      message: err?.message || "Reservation created, but confirmation email failed.",
+      links: null,
+    };
+  });
+
+  const smsResult = await sendReservationConfirmationSms(booking).catch((err) => {
+    console.error("Failed to send confirmation SMS:", err?.message || err);
+    return {
+      sent: false,
+      reason: err?.code || "sms_error",
+      message: err?.message || "Reservation created, but confirmation SMS failed.",
+      links: emailResult?.links ?? null,
+    };
+  });
+
+  return {
+    ...booking,
+    confirmationEmail: emailResult,
+    confirmationSms: smsResult,
+    identityVerified: true,
+  };
+}
+
 async function createPublicReservation(data) {
   validatePublicReservationPayload(data);
 
@@ -1895,7 +2008,13 @@ async function getPrecheckoutBookingByToken(token) {
     throw buildAppError("Pre-checkout token no longer matches booking guest", 403);
   }
 
-  return booking;
+  const identityVerified = await isBookingIdentityVerified(booking.id);
+
+  return {
+    ...booking,
+    identityVerified,
+    identityVerificationRequired: true,
+  };
 }
 
 async function uploadPrecheckoutGuestDocument(token, documentKind, file) {
@@ -1981,6 +2100,18 @@ async function getPublicBookingByIdForGuest(id, guest = {}) {
 
 async function checkoutBookingPublic(id, data, photos = [], guest = {}) {
   await getPublicBookingByIdForGuest(id, guest);
+
+  const identityVerified = await isBookingIdentityVerified(id);
+  if (!identityVerified) {
+    throw buildAppError(
+      "Identity verification is required before pickup. Please complete the Stripe Identity step first.",
+      403,
+      {
+        identityVerificationRequired: true,
+      }
+    );
+  }
+
   return checkoutBooking(id, data, photos);
 }
 
@@ -2492,6 +2623,9 @@ module.exports = {
   getBookingById,
   createBooking,
   createPublicReservation,
+  createPublicReservationDraft,
+  createPublicReservationIdentitySession,
+  finalizePublicReservation,
   createGuestPrecheckoutLink,
   processAutomaticPrecheckoutPrompts,
   getPrecheckoutBookingByToken,

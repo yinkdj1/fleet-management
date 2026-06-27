@@ -18,6 +18,8 @@ const {
   getPublicGeocodeReverse,
   createTestPayment,
   createPublicReservation,
+  createPublicReservationIdentitySession,
+  finalizePublicReservation,
 } = require("../controllers/publicController");
 const upload = require("../middleware/uploadMiddleware");
 const {
@@ -99,6 +101,17 @@ router.post(
   paymentRateLimiter,
   honeypotGuard,
   createTestPayment
+);
+router.post(
+  "/reservations/identity-session",
+  reservationRateLimiter,
+  honeypotGuard,
+  createPublicReservationIdentitySession
+);
+router.post(
+  "/reservations/:id/finalize-identity",
+  reservationRateLimiter,
+  finalizePublicReservation
 );
 router.post(
   "/reservations",

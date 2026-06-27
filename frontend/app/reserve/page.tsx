@@ -2,6 +2,7 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { Inter } from "next/font/google";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../lib/api";
 
@@ -557,6 +558,8 @@ export default function ReservePage() {
       setCouponInput("");
       setCouponMessage(null);
     };
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [themeMode, setThemeMode] = useState<"auto" | "day" | "night">("auto");
   const [rentalThemeClass, setRentalThemeClass] = useState(
     "reserve-rental-bg-day",
@@ -629,6 +632,69 @@ export default function ReservePage() {
   useEffect(() => {
     setMaxDateOfBirth(formatDateForInput(getMinimumAllowedDateOfBirth()));
   }, []);
+
+  useEffect(() => {
+    const bookingId = searchParams.get("bookingId");
+    const identityStatus = searchParams.get("identity");
+
+    if (identityStatus === "done" && bookingId) {
+      const finalizeReservation = async () => {
+        try {
+          setSubmitting(true);
+          const res = await api.post(`/public/reservations/${bookingId}/finalize-identity`);
+          const reservation = res.data?.data || null;
+          const bookingIdFromResponse = reservation?.id;
+          const confirmationEmailMessage = reservation?.confirmationEmail?.message;
+          const confirmationSmsMessage = reservation?.confirmationSms?.message;
+          const confirmationEmailLinks = reservation?.confirmationEmail?.links;
+          const confirmationSmsLinks = reservation?.confirmationSms?.links;
+          const manageToken =
+            confirmationEmailLinks?.token ||
+            confirmationSmsLinks?.token ||
+            extractManageTokenFromUrl(confirmationEmailLinks?.manageUrl) ||
+            extractManageTokenFromUrl(confirmationEmailLinks?.modifyUrl) ||
+            extractManageTokenFromUrl(confirmationEmailLinks?.cancelUrl) ||
+            extractManageTokenFromUrl(confirmationSmsLinks?.manageUrl) ||
+            extractManageTokenFromUrl(confirmationSmsLinks?.modifyUrl) ||
+            extractManageTokenFromUrl(confirmationSmsLinks?.cancelUrl) ||
+            (reservation?.manageToken as string | undefined);
+          const deletionToken = reservation?.deletionToken as string | undefined;
+
+          if (bookingIdFromResponse) {
+            setConfirmationDetails({
+              bookingId: bookingIdFromResponse,
+              firstName: reservation.customer?.firstName || "",
+              lastName: reservation.customer?.lastName || "",
+              vehicleMake: reservation.vehicle?.make || "",
+              vehicleModel: reservation.vehicle?.model || "",
+              vehiclePlate: reservation.vehicle?.plateNumber || "",
+              pickupDatetime: reservation.pickupDatetime,
+              returnDatetime: reservation.returnDatetime,
+              pickupLocation,
+              total: Number(reservation.totalAmount || 0),
+              paymentReference: "",
+              emailMessage: confirmationEmailMessage,
+              smsMessage: confirmationSmsMessage,
+              deletionToken,
+              manageToken,
+            });
+          }
+        } catch (err: unknown) {
+          setError(
+            getApiErrorMessage(
+              err,
+              "Identity verification was not completed successfully, so your booking cannot be confirmed yet."
+            )
+          );
+        } finally {
+          setSubmitting(false);
+          router.replace("/reserve");
+        }
+      };
+
+      finalizeReservation();
+    }
+  }, [pickupLocation, router, searchParams]);
 
   useEffect(() => {
     const query = form.addressLine.trim();
@@ -1427,7 +1493,7 @@ export default function ReservePage() {
     try {
       setSubmitting(true);
 
-      const res = await api.post("/public/reservations", {
+      const res = await api.post("/public/reservations/identity-session", {
         customer: {
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
@@ -1445,25 +1511,32 @@ export default function ReservePage() {
         returnDatetime: new Date(form.returnDatetime).toISOString(),
         paymentStatus: "paid",
         paymentReference: form.paymentReference.trim(),
+        returnUrl: `${window.location.origin}/reserve?identity=done`,
       });
 
-      const bookingId = res.data?.data?.id;
+      const identitySessionUrl = res.data?.data?.identitySession?.url;
+      if (identitySessionUrl) {
+        window.location.href = identitySessionUrl;
+        return;
+      }
+
+      const bookingId = res.data?.data?.booking?.id;
       const confirmationEmailMessage =
-        res.data?.data?.confirmationEmail?.message;
-      const confirmationSmsMessage = res.data?.data?.confirmationSms?.message;
-        const confirmationEmailLinks = res.data?.data?.confirmationEmail?.links;
-        const confirmationSmsLinks = res.data?.data?.confirmationSms?.links;
-        const manageToken =
-          confirmationEmailLinks?.token ||
-          confirmationSmsLinks?.token ||
-          extractManageTokenFromUrl(confirmationEmailLinks?.manageUrl) ||
-          extractManageTokenFromUrl(confirmationEmailLinks?.modifyUrl) ||
-          extractManageTokenFromUrl(confirmationEmailLinks?.cancelUrl) ||
-          extractManageTokenFromUrl(confirmationSmsLinks?.manageUrl) ||
-          extractManageTokenFromUrl(confirmationSmsLinks?.modifyUrl) ||
-          extractManageTokenFromUrl(confirmationSmsLinks?.cancelUrl) ||
-          (res.data?.data?.manageToken as string | undefined);
-        const deletionToken = res.data?.data?.deletionToken as string | undefined;
+        res.data?.data?.booking?.confirmationEmail?.message;
+      const confirmationSmsMessage = res.data?.data?.booking?.confirmationSms?.message;
+      const confirmationEmailLinks = res.data?.data?.booking?.confirmationEmail?.links;
+      const confirmationSmsLinks = res.data?.data?.booking?.confirmationSms?.links;
+      const manageToken =
+        confirmationEmailLinks?.token ||
+        confirmationSmsLinks?.token ||
+        extractManageTokenFromUrl(confirmationEmailLinks?.manageUrl) ||
+        extractManageTokenFromUrl(confirmationEmailLinks?.modifyUrl) ||
+        extractManageTokenFromUrl(confirmationEmailLinks?.cancelUrl) ||
+        extractManageTokenFromUrl(confirmationSmsLinks?.manageUrl) ||
+        extractManageTokenFromUrl(confirmationSmsLinks?.modifyUrl) ||
+        extractManageTokenFromUrl(confirmationSmsLinks?.cancelUrl) ||
+        (res.data?.data?.booking?.manageToken as string | undefined);
+      const deletionToken = res.data?.data?.booking?.deletionToken as string | undefined;
 
       if (bookingId && selectedVehicle && pricePreview) {
         setConfirmationDetails({
@@ -2557,6 +2630,9 @@ export default function ReservePage() {
                       Please select a vehicle and valid pickup/return dates to see the Reservation Preview before confirming.
                     </p>
                   )}
+                  <div className="md:col-span-2 xl:col-span-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    Identity verification is required before your reservation can be confirmed. If verification is incomplete, rejected, or fails, your booking will stay pending and we will show you the reason why it cannot be confirmed.
+                  </div>
                   <button
                     type="submit"
                     disabled={

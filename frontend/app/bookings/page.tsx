@@ -30,6 +30,16 @@ type Booking = {
     plateNumber?: string | null;
     year?: number | null;
   } | null;
+  documents?: Array<{ documentType?: string | null }> | null;
+};
+
+const getApiErrorMessage = (err: unknown, fallback: string) => {
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const response = (err as { response?: { data?: { message?: string } } }).response?.data;
+    return response?.message || fallback;
+  }
+
+  return fallback;
 };
 
 export default function BookingsPage() {
@@ -120,8 +130,8 @@ export default function BookingsPage() {
       setBookings(nextData);
       setTotal(Number(pagination.total || 0));
       setTotalPages(Number(pagination.totalPages || 1));
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load bookings");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to load bookings"));
     } finally {
       setLoading(false);
     }
@@ -150,10 +160,9 @@ export default function BookingsPage() {
       const res = await api.post(`/bookings/${bookingId}/precheckout-link`);
       const payload = res.data?.data || {};
       setActionMessage(payload.message || `Pre-checkout prompt sent for booking ${formatBookingId(bookingId)}.`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setActionError(
-        err.response?.data?.message ||
-          `Unable to send pre-checkout prompt for booking #${bookingId}.`
+        getApiErrorMessage(err, `Unable to send pre-checkout prompt for booking #${bookingId}.`)
       );
     } finally {
       setSendingPrecheckoutId(null);
@@ -184,6 +193,13 @@ export default function BookingsPage() {
 
   const normalizedStatus = (status: string | null) => (status || "").toLowerCase();
 
+  const isIdentityVerified = (booking: Booking) =>
+    Boolean(
+      booking.documents?.some(
+        (doc) => String(doc.documentType || "").trim() === "stripe_identity_verified"
+      )
+    );
+
   const sortBookingsByStatus = (list: Booking[]) => {
     return [...list].sort((a, b) => {
       const aStatus = normalizedStatus(a.status);
@@ -213,8 +229,8 @@ export default function BookingsPage() {
 
       setActiveBookings(nextData);
       setActiveTotalPages(Number(pagination.totalPages || 1));
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load active bookings");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to load active bookings"));
     } finally {
       setActiveLoading(false);
     }
@@ -238,8 +254,8 @@ export default function BookingsPage() {
 
       setCompletedBookings(nextData);
       setCompletedTotalPages(Number(pagination.totalPages || 1));
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load completed bookings");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to load completed bookings"));
     } finally {
       setCompletedLoading(false);
     }
@@ -263,8 +279,8 @@ export default function BookingsPage() {
 
       setOtherBookings(nextData);
       setOtherTotalPages(Number(pagination.totalPages || 1));
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to load other bookings");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to load other bookings"));
     } finally {
       setOtherLoading(false);
     }
@@ -290,7 +306,7 @@ export default function BookingsPage() {
     if (bookingList.length === 0) {
       return (
         <tr>
-          <td colSpan={13} className="text-center p-6 text-gray-500">
+          <td colSpan={14} className="text-center p-6 text-gray-500">
             {isLoading ? "Loading bookings..." : "No bookings found"}
           </td>
         </tr>
@@ -344,13 +360,24 @@ export default function BookingsPage() {
         </td>
 
         <td className="px-2 py-1.5 whitespace-nowrap">
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(
-              booking.status
-            )}`}
-          >
-            {booking.status || "-"}
-          </span>
+          <div className="flex flex-col gap-1">
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(
+                booking.status
+              )}`}
+            >
+              {booking.status || "-"}
+            </span>
+            <span
+              className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${
+                isIdentityVerified(booking)
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-amber-100 text-amber-700"
+              }`}
+            >
+              {isIdentityVerified(booking) ? "Identity Verified" : "Identity Pending"}
+            </span>
+          </div>
         </td>
 
         <td className="px-2 py-1.5 whitespace-nowrap">
@@ -392,8 +419,8 @@ export default function BookingsPage() {
                     await api.delete(`/bookings/${booking.id}`);
                     setActionMessage(`Booking ${formatBookingId(booking.id)} deleted.`);
                     await refreshBookings();
-                  } catch (err: any) {
-                    setActionError(err.response?.data?.message || `Failed to delete booking ${formatBookingId(booking.id)}.`);
+                  } catch (err: unknown) {
+                    setActionError(getApiErrorMessage(err, `Failed to delete booking ${formatBookingId(booking.id)}.`));
                   } finally {
                     setDeletingBookingId(null);
                   }
@@ -488,7 +515,8 @@ export default function BookingsPage() {
               )}
             </div>
             </th>
-              <th className="text-left px-2 py-1.5 whitespace-nowrap">Actions</th>
+            <th className="text-left px-2 py-1.5 whitespace-nowrap">Identity</th>
+            <th className="text-left px-2 py-1.5 whitespace-nowrap">Actions</th>
           </tr>
         </thead>
         <tbody>{renderBookingRows(sortedBookingList, isLoading)}</tbody>
@@ -608,8 +636,8 @@ export default function BookingsPage() {
       setActionMessage(`Booking ${formatBookingId(editingBooking.id)} updated successfully.`);
       closeEditModal();
       await refreshBookings();
-    } catch (err: any) {
-      setEditError(err.response?.data?.message || "Failed to update booking.");
+    } catch (err: unknown) {
+      setEditError(getApiErrorMessage(err, "Failed to update booking."));
     } finally {
       setSavingEdit(false);
     }
