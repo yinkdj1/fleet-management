@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { Inter } from "next/font/google";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import api from "../../lib/api";
 
 const ChatWidget = dynamic(() => import("../components/ChatWidget"), { ssr: false });
@@ -523,7 +523,7 @@ type Vehicle = {
   category?: string;
 };
 
-export default function ReservePage() {
+function ReservePageContent() {
     // Coupon state for reservation
     const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
     const [couponInput, setCouponInput] = useState("");
@@ -2932,5 +2932,13 @@ export default function ReservePage() {
 
         </div>
       </main>
+  );
+}
+
+export default function ReservePage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen" />}>
+      <ReservePageContent />
+    </Suspense>
   );
 }
