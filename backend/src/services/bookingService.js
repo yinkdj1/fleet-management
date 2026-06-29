@@ -914,13 +914,12 @@ function validatePublicReservationPayload(data = {}) {
     errors.returnDatetime = "Return datetime is required";
   }
 
-  if (data.paymentStatus !== "paid") {
-    errors.paymentStatus = "Payment must be completed before confirming reservation";
+  if (data.paymentStatus) {
+    const normalizedPaymentStatus = String(data.paymentStatus).trim().toLowerCase();
+    if (!["unpaid", "pending", "paid"].includes(normalizedPaymentStatus)) {
+      errors.paymentStatus = "Payment status is invalid";
+    }
   }
-
-  // paymentReference is optional - Stripe payment intent ID
-  // It's provided after successful payment but not required for validation
-  // The paymentStatus check above is sufficient
 
   if (Object.keys(errors).length > 0) {
     throw buildAppError("Validation failed", 400, errors);
