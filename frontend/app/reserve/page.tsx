@@ -2537,22 +2537,6 @@ export default function ReservePage() {
                       <label className="flex items-start gap-2 text-sm text-zinc-800">
                         <input
                           type="checkbox"
-                          checked={communicationChecks.smsConsent}
-                          onChange={(e) => {
-                            setCommunicationChecks({
-                              smsConsent: e.target.checked,
-                            });
-                          }}
-                          className="mt-0.5"
-                        />
-                        I agree to receive transactional SMS updates about my
-                        reservation at the phone number above. Message frequency
-                        varies. Message and data rates may apply. Reply STOP to
-                        opt out.
-                      </label>
-                      <label className="flex items-start gap-2 text-sm text-zinc-800">
-                        <input
-                          type="checkbox"
                           checked={termsChecks.accuracy}
                           onChange={(e) => {
                             setTermsChecks((prev) => ({
@@ -2624,6 +2608,25 @@ export default function ReservePage() {
                         />
                         I understand this checkmark acceptance is my electronic
                         signature.
+                      </label>
+                    </div>
+
+                    <div className={`rounded-xl border px-3 py-3 ${isNightTheme ? "border-slate-500 bg-slate-800/60" : "border-emerald-200 bg-emerald-50"}`}>
+                      <p className={`mb-2 text-sm font-semibold ${isNightTheme ? "text-slate-100" : "text-emerald-900"}`}>
+                        SMS Opt-In
+                      </p>
+                      <label className={`flex items-start gap-2 text-sm ${isNightTheme ? "text-slate-200" : "text-zinc-800"}`}>
+                        <input
+                          type="checkbox"
+                          checked={communicationChecks.smsConsent}
+                          onChange={(e) => {
+                            setCommunicationChecks({
+                              smsConsent: e.target.checked,
+                            });
+                          }}
+                          className="mt-0.5"
+                        />
+                        I agree to receive transactional SMS updates about my reservation at the phone number above. Message frequency varies. Message and data rates may apply. Reply STOP to opt out.
                       </label>
                     </div>
 
