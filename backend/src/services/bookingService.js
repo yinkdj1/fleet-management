@@ -48,7 +48,7 @@ async function sendPickupCheckinNotifications(booking) {
       text: body,
     });
   }
-  if (booking.customer?.phone && hasTwilioSmsConfig()) {
+  if (booking.customer?.phone && hasTwilioSmsConfig() && await hasBookingSmsConsent(booking.id)) {
     const client = getTwilioClient();
     const body = smsTemplate
       ? renderSmsTemplate(smsTemplate.body, booking, links)
@@ -101,7 +101,7 @@ async function sendMidwayCheckinNotifications(booking) {
       text: body || defaultExtendText,
     });
   }
-  if (booking.customer?.phone && hasTwilioSmsConfig()) {
+  if (booking.customer?.phone && hasTwilioSmsConfig() && await hasBookingSmsConsent(booking.id)) {
     const client = getTwilioClient();
     const body = smsTemplate
       ? renderSmsTemplate(smsTemplate.body, booking, links)
@@ -139,7 +139,7 @@ async function sendDropoffThankYouNotifications(booking) {
       text: body,
     });
   }
-  if (booking.customer?.phone && hasTwilioSmsConfig()) {
+  if (booking.customer?.phone && hasTwilioSmsConfig() && await hasBookingSmsConsent(booking.id)) {
     const client = getTwilioClient();
     const body = smsTemplate
       ? renderSmsTemplate(smsTemplate.body, booking, links)
@@ -210,6 +210,7 @@ const { createIdentitySession, isBookingIdentityVerified } = require("./stripeId
 const twilio = require("twilio");
 
 const PRECHECKOUT_AUTO_MARKER_TYPE = "precheckout_prompt_auto_sent";
+const SMS_CONSENT_DOCUMENT_TYPE = "sms_consent";
 let twilioClient;
 
 const CHECKOUT_SAFE_INCLUDE = {
@@ -405,6 +406,51 @@ function getTwilioClient() {
   }
 
   return twilioClient;
+}
+
+async function hasBookingSmsConsent(bookingId) {
+  if (!bookingId) return false;
+
+  const marker = await prisma.document.findFirst({
+    where: {
+      bookingId: Number(bookingId),
+      documentType: SMS_CONSENT_DOCUMENT_TYPE,
+    },
+    select: { id: true },
+  });
+
+  return Boolean(marker);
+}
+
+async function recordBookingSmsConsent(booking, customer = {}) {
+  if (!booking?.id || !customer?.smsConsent) {
+    return;
+  }
+
+  const existingMarker = await prisma.document.findFirst({
+    where: {
+      bookingId: Number(booking.id),
+      documentType: SMS_CONSENT_DOCUMENT_TYPE,
+    },
+    select: { id: true },
+  });
+
+  if (existingMarker) {
+    return;
+  }
+
+  await prisma.document.create({
+    data: {
+      bookingId: Number(booking.id),
+      customerId: booking.customerId ? Number(booking.customerId) : null,
+      documentType: SMS_CONSENT_DOCUMENT_TYPE,
+      fileUrl: JSON.stringify({
+        source: "public_reservation",
+        phone: normalizePhone(customer.phone || booking.customer?.phone),
+        consentedAt: new Date().toISOString(),
+      }),
+    },
+  });
 }
 
 function getMinimumAllowedDateOfBirth(today = new Date()) {
@@ -1157,6 +1203,16 @@ async function sendReservationConfirmationSms(booking) {
     };
   }
 
+  if (!await hasBookingSmsConsent(booking?.id)) {
+    console.log(`[SMS] Skipped — no SMS consent recorded for booking #${booking?.id}`);
+    return {
+      sent: false,
+      reason: "sms_consent_missing",
+      message: "Reservation created. SMS confirmation skipped because SMS consent was not provided.",
+      links: null,
+    };
+  }
+
   const links = buildGuestManageLinks(booking);
   const vehicleLabel = `${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""}`.trim();
   const plateNumber = booking.vehicle?.plateNumber || "N/A";
@@ -1406,6 +1462,8 @@ async function createPublicReservationIdentitySession(data = {}) {
     await prisma.booking.delete({ where: { id: booking.id } }).catch(() => {});
     throw buildAppError("Stripe Identity verification could not be started. Please try again.", 502);
   }
+
+  await recordBookingSmsConsent(booking, data.customer || {});
 
   return {
     bookingId: booking.id,

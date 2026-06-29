@@ -145,6 +145,10 @@ type TermsChecks = {
   esign: boolean;
 };
 
+type CommunicationChecks = {
+  smsConsent: boolean;
+};
+
 type FieldErrors = Partial<
   Record<
     | "firstName"
@@ -585,6 +589,10 @@ export default function ReservePage() {
     authorization: false,
     esign: false,
   });
+  const [communicationChecks, setCommunicationChecks] =
+    useState<CommunicationChecks>({
+      smsConsent: false,
+    });
 
   const [paymentForm, setPaymentForm] = useState<PaymentForm>({
     cardholderName: "",
@@ -1022,6 +1030,9 @@ export default function ReservePage() {
       authorization: false,
       esign: false,
     });
+    setCommunicationChecks({
+      smsConsent: false,
+    });
   };
 
   const handleChange = (
@@ -1306,6 +1317,9 @@ export default function ReservePage() {
         authorization: false,
         esign: false,
       });
+      setCommunicationChecks({
+        smsConsent: false,
+      });
       setLookupMessage("");
       setPaymentMessage(`Payment confirmed. Reference: ${paymentIntentId}`);
       setIdentityVerificationComplete(false);
@@ -1542,6 +1556,7 @@ export default function ReservePage() {
           zip: form.zip.trim(),
           driversLicenseNo: form.driversLicenseNo.trim(),
           dateOfBirth: form.dateOfBirth,
+          smsConsent: communicationChecks.smsConsent,
         },
         vehicleId: Number(form.vehicleId),
         pickupDatetime: new Date(form.pickupDatetime).toISOString(),
@@ -1552,88 +1567,24 @@ export default function ReservePage() {
       });
 
       const identitySessionUrl = res.data?.data?.identitySession?.url;
-      if (identitySessionUrl) {
-        window.location.href = identitySessionUrl;
-        return;
+      if (!identitySessionUrl) {
+        throw new Error("Stripe Identity could not be started. Please try again.");
       }
 
-      const bookingId = res.data?.data?.booking?.id;
-      const confirmationEmailMessage =
-        res.data?.data?.booking?.confirmationEmail?.message;
-      const confirmationSmsMessage = res.data?.data?.booking?.confirmationSms?.message;
-      const confirmationEmailLinks = res.data?.data?.booking?.confirmationEmail?.links;
-      const confirmationSmsLinks = res.data?.data?.booking?.confirmationSms?.links;
-      const manageToken =
-        confirmationEmailLinks?.token ||
-        confirmationSmsLinks?.token ||
-        extractManageTokenFromUrl(confirmationEmailLinks?.manageUrl) ||
-        extractManageTokenFromUrl(confirmationEmailLinks?.modifyUrl) ||
-        extractManageTokenFromUrl(confirmationEmailLinks?.cancelUrl) ||
-        extractManageTokenFromUrl(confirmationSmsLinks?.manageUrl) ||
-        extractManageTokenFromUrl(confirmationSmsLinks?.modifyUrl) ||
-        extractManageTokenFromUrl(confirmationSmsLinks?.cancelUrl) ||
-        (res.data?.data?.booking?.manageToken as string | undefined);
-      const deletionToken = res.data?.data?.booking?.deletionToken as string | undefined;
-
-      if (bookingId && selectedVehicle && pricePreview) {
-        setConfirmationDetails({
-          bookingId,
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          vehicleMake: selectedVehicle.make,
-          vehicleModel: selectedVehicle.model,
-          vehiclePlate: selectedVehicle.plateNumber ?? "",
-          pickupDatetime: form.pickupDatetime,
-          returnDatetime: form.returnDatetime,
-          pickupLocation,
-          total: pricePreview.total,
-          paymentReference: form.paymentReference.trim(),
-          emailMessage: confirmationEmailMessage,
-          smsMessage: confirmationSmsMessage,
-          deletionToken,
-          manageToken,
-        });
-      }
-
-      setForm({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        addressLine: "",
-        city: "",
-        state: "",
-        zip: "",
-        driversLicenseNo: "",
-        dateOfBirth: "",
-        pickupDatetime: "",
-        returnDatetime: "",
-        vehicleId: "",
-        paymentReference: "",
-        paymentConfirmed: false,
-      });
-      setPaymentForm({
-        cardholderName: "",
-        cardNumber: "",
-        expiry: "",
-        cvv: "",
-      });
-      setTermsChecks({
-        accuracy: false,
-        agreement: false,
-        authorization: false,
-        esign: false,
-      });
-      setLookupMessage("");
-      setPaymentMessage("");
-      setVehicles([]);
+      window.location.href = identitySessionUrl;
+      return;
     } catch (err: unknown) {
       const responseErrors =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { errors?: FieldErrors } } }).response
               ?.data?.errors || {}
           : {};
-      setError(getApiErrorMessage(err, "Failed to submit reservation"));
+      setError(
+        getApiErrorMessage(
+          err,
+          "Stripe Identity could not be started. Your reservation was not confirmed."
+        )
+      );
       setFieldErrors(responseErrors);
     } finally {
       setSubmitting(false);
@@ -2586,6 +2537,22 @@ export default function ReservePage() {
                       <label className="flex items-start gap-2 text-sm text-zinc-800">
                         <input
                           type="checkbox"
+                          checked={communicationChecks.smsConsent}
+                          onChange={(e) => {
+                            setCommunicationChecks({
+                              smsConsent: e.target.checked,
+                            });
+                          }}
+                          className="mt-0.5"
+                        />
+                        I agree to receive transactional SMS updates about my
+                        reservation at the phone number above. Message frequency
+                        varies. Message and data rates may apply. Reply STOP to
+                        opt out.
+                      </label>
+                      <label className="flex items-start gap-2 text-sm text-zinc-800">
+                        <input
+                          type="checkbox"
                           checked={termsChecks.accuracy}
                           onChange={(e) => {
                             setTermsChecks((prev) => ({
@@ -2673,7 +2640,7 @@ export default function ReservePage() {
                     </p>
                   )}
                   <div className="md:col-span-2 xl:col-span-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                    Identity verification is required before your reservation can be confirmed. If verification is incomplete, rejected, or fails, your booking will stay pending and we will show you the reason why it cannot be confirmed.
+                    Identity verification is required before your reservation can be confirmed. If verification is incomplete, rejected, or fails, your booking will stay pending and we will show you the reason why it cannot be confirmed. If Stripe Identity cannot be started, your reservation will stop here and no booking will be confirmed.
                   </div>
                   <button
                     type="submit"
@@ -2690,7 +2657,7 @@ export default function ReservePage() {
                     className="attention-bounce md:col-span-2 xl:col-span-4 w-full rounded-xl bg-[#2f66e8] px-4 py-3 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2257d6] disabled:opacity-60"
                   >
                     {submitting
-                      ? "Processing Identity Verification..."
+                      ? "Starting Identity Verification..."
                       : "Continue to Identity Verification"}
                   </button>
                 </>
