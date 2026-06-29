@@ -1394,7 +1394,18 @@ async function createPublicReservationIdentitySession(data = {}) {
   const returnUrl = new URL(baseUrl, process.env.FRONTEND_URL || "https://fleet-management-bay-ten.vercel.app");
   returnUrl.searchParams.set("bookingId", String(booking.id));
 
-  const identitySession = await createIdentitySession(booking.id, returnUrl.toString());
+  let identitySession;
+  try {
+    identitySession = await createIdentitySession(booking.id, returnUrl.toString());
+  } catch (error) {
+    await prisma.booking.delete({ where: { id: booking.id } }).catch(() => {});
+    throw error;
+  }
+
+  if (!identitySession?.url) {
+    await prisma.booking.delete({ where: { id: booking.id } }).catch(() => {});
+    throw buildAppError("Stripe Identity verification could not be started. Please try again.", 502);
+  }
 
   return {
     bookingId: booking.id,
@@ -1477,47 +1488,11 @@ async function finalizePublicReservation(bookingId, data = {}) {
 }
 
 async function createPublicReservation(data) {
-  validatePublicReservationPayload(data);
-
-  const customer = await findOrCreatePublicCustomer(data.customer || {});
-
-  const booking = await createBooking({
-    customerId: customer.id,
-    vehicleId: data.vehicleId,
-    pickupDatetime: data.pickupDatetime,
-    returnDatetime: data.returnDatetime,
-    status: "reserved",
-    paymentStatus: "paid",
-  });
-
-  // Send email first, then send SMS; include actual delivery results in the response.
-  const emailResult = await sendReservationConfirmationEmail(booking).catch((err) => {
-    console.error("Failed to send confirmation email:", err?.message || err);
-    return {
-      sent: false,
-      reason: err?.code || "email_error",
-      message:
-        err?.message || "Reservation created, but confirmation email failed.",
-      links: null,
-    };
-  });
-
-  const smsResult = await sendReservationConfirmationSms(booking).catch((err) => {
-    console.error("Failed to send confirmation SMS:", err?.message || err);
-    return {
-      sent: false,
-      reason: err?.code || "sms_error",
-      message:
-        err?.message || "Reservation created, but confirmation SMS failed.",
-      links: emailResult?.links ?? null,
-    };
-  });
-
-  return {
-    ...booking,
-    confirmationEmail: emailResult,
-    confirmationSms: smsResult,
-  };
+  throw buildAppError(
+    "Direct reservation creation is not allowed. Identity verification is required. Please use the identity-session endpoint.",
+    403,
+    { identityVerificationRequired: true }
+  );
 }
 
 function verifyGuestManageToken(token) {
