@@ -2545,10 +2545,22 @@ function ReservePageContent() {
                           }}
                           className="mt-0.5"
                         />
-                        I agree to receive transactional SMS updates about my
-                        reservation at the phone number above. Message frequency
-                        varies. Message and data rates may apply. Reply STOP to
-                        opt out.
+                        <span>
+                          I agree to receive transactional SMS updates about my
+                          reservation at the phone number above. Message frequency
+                          varies. Message and data rates may apply. Reply STOP to
+                          opt out. See our{" "}
+                          <a
+                            href="/privacy-policy"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-medium text-blue-700 underline hover:text-blue-800"
+                          >
+                            Privacy Policy
+                          </a>
+                          .
+                        </span>
                       </label>
                       <label className="flex items-start gap-2 text-sm text-zinc-800">
                         <input
@@ -2584,8 +2596,19 @@ function ReservePageContent() {
                           }}
                           className="mt-0.5"
                         />
-                        I have read and agree to the Georgia Vehicle Rental
-                        Terms and Conditions.
+                        <span>
+                          I have read and agree to the Georgia Vehicle Rental{" "}
+                          <a
+                            href="/terms-and-conditions"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-medium text-blue-700 underline hover:text-blue-800"
+                          >
+                            Terms and Conditions
+                          </a>
+                          .
+                        </span>
                       </label>
                       <label className="flex items-start gap-2 text-sm text-zinc-800">
                         <input
