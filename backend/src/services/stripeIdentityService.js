@@ -10,6 +10,10 @@ function getStripe() {
   return require("stripe")(key);
 }
 
+function isStripeIdentityEnabled() {
+  return Boolean(process.env.STRIPE_SECRET_KEY);
+}
+
 /**
  * Create a Stripe Identity VerificationSession for a precheckout booking.
  * Returns { clientSecret, sessionId } to the frontend.
@@ -112,6 +116,10 @@ async function handleIdentityWebhook(rawBody, signature) {
  * Check if a booking has a verified Stripe Identity session.
  */
 async function isBookingIdentityVerified(bookingId) {
+  if (!isStripeIdentityEnabled()) {
+    return true;
+  }
+
   const doc = await prisma.document.findFirst({
     where: {
       bookingId: Number(bookingId),
@@ -125,4 +133,5 @@ module.exports = {
   createIdentitySession,
   handleIdentityWebhook,
   isBookingIdentityVerified,
+  isStripeIdentityEnabled,
 };

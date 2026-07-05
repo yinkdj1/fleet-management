@@ -2,7 +2,8 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { Inter } from "next/font/google";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import api from "../../lib/api";
 
 const ChatWidget = dynamic(() => import("../components/ChatWidget"), { ssr: false });
@@ -142,6 +143,10 @@ type TermsChecks = {
   agreement: boolean;
   authorization: boolean;
   esign: boolean;
+};
+
+type CommunicationChecks = {
+  smsConsent: boolean;
 };
 
 type FieldErrors = Partial<
@@ -518,7 +523,7 @@ type Vehicle = {
   category?: string;
 };
 
-export default function ReservePage() {
+function ReservePageContent() {
     // Coupon state for reservation
     const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
     const [couponInput, setCouponInput] = useState("");
@@ -557,6 +562,8 @@ export default function ReservePage() {
       setCouponInput("");
       setCouponMessage(null);
     };
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [themeMode, setThemeMode] = useState<"auto" | "day" | "night">("auto");
   const [rentalThemeClass, setRentalThemeClass] = useState(
     "reserve-rental-bg-day",
@@ -582,6 +589,10 @@ export default function ReservePage() {
     authorization: false,
     esign: false,
   });
+  const [communicationChecks, setCommunicationChecks] =
+    useState<CommunicationChecks>({
+      smsConsent: false,
+    });
 
   const [paymentForm, setPaymentForm] = useState<PaymentForm>({
     cardholderName: "",
@@ -620,6 +631,8 @@ export default function ReservePage() {
   const vehicleRequestIdRef = useRef(0);
   const addressRequestIdRef = useRef(0);
   const confirmPaymentRef = useRef<(() => Promise<void>) | null>(null);
+  const [identityVerificationComplete, setIdentityVerificationComplete] = useState(false);
+  const [pendingIdentityBookingId, setPendingIdentityBookingId] = useState<number | null>(null);
   const [maxDateOfBirth, setMaxDateOfBirth] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
@@ -629,6 +642,19 @@ export default function ReservePage() {
   useEffect(() => {
     setMaxDateOfBirth(formatDateForInput(getMinimumAllowedDateOfBirth()));
   }, []);
+
+  useEffect(() => {
+    const bookingId = searchParams.get("bookingId");
+    const identityStatus = searchParams.get("identity");
+
+    if (identityStatus === "done" && bookingId) {
+      setIdentityVerificationComplete(true);
+      setPendingIdentityBookingId(Number(bookingId));
+      setPaymentMessage("Identity verified. Complete payment to confirm your reservation.");
+      setError("");
+      router.replace("/reserve");
+    }
+  }, [pickupLocation, router, searchParams]);
 
   useEffect(() => {
     const query = form.addressLine.trim();
@@ -1004,6 +1030,9 @@ export default function ReservePage() {
       authorization: false,
       esign: false,
     });
+    setCommunicationChecks({
+      smsConsent: false,
+    });
   };
 
   const handleChange = (
@@ -1193,19 +1222,117 @@ export default function ReservePage() {
     }
   };
 
-  const handleStripePaymentSuccess = (paymentIntentId: string) => {
-    setForm((prev) => ({
-      ...prev,
-      paymentReference: paymentIntentId,
-      paymentConfirmed: true,
-    }));
-    setPaymentMessage(`Payment confirmed. Reference: ${paymentIntentId}`);
-    setFieldErrors((prev) => ({
-      ...prev,
-      paymentReference: "",
-      paymentConfirmed: "",
-      paymentStatus: "",
-    }));
+  const handleStripePaymentSuccess = async (paymentIntentId: string) => {
+    if (!pendingIdentityBookingId) {
+      setError("Identity verification must be completed before payment can be processed.");
+      setFieldErrors((prev) => ({
+        ...prev,
+        paymentStatus: "Identity verification must be completed before payment can be processed.",
+      }));
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setForm((prev) => ({
+        ...prev,
+        paymentReference: paymentIntentId,
+        paymentConfirmed: true,
+      }));
+      setPaymentMessage("Payment confirmed. Finalizing your reservation...");
+      setFieldErrors((prev) => ({
+        ...prev,
+        paymentReference: "",
+        paymentConfirmed: "",
+        paymentStatus: "",
+      }));
+
+      const res = await api.post(`/public/reservations/${pendingIdentityBookingId}/finalize-identity`, {
+        paymentStatus: "paid",
+      });
+      const reservation = res.data?.data || null;
+      const bookingIdFromResponse = reservation?.id;
+      const confirmationEmailMessage = reservation?.confirmationEmail?.message;
+      const confirmationSmsMessage = reservation?.confirmationSms?.message;
+      const confirmationEmailLinks = reservation?.confirmationEmail?.links;
+      const confirmationSmsLinks = reservation?.confirmationSms?.links;
+      const manageToken =
+        confirmationEmailLinks?.token ||
+        confirmationSmsLinks?.token ||
+        extractManageTokenFromUrl(confirmationEmailLinks?.manageUrl) ||
+        extractManageTokenFromUrl(confirmationEmailLinks?.modifyUrl) ||
+        extractManageTokenFromUrl(confirmationEmailLinks?.cancelUrl) ||
+        extractManageTokenFromUrl(confirmationSmsLinks?.manageUrl) ||
+        extractManageTokenFromUrl(confirmationSmsLinks?.modifyUrl) ||
+        extractManageTokenFromUrl(confirmationSmsLinks?.cancelUrl) ||
+        (reservation?.manageToken as string | undefined);
+      const deletionToken = reservation?.deletionToken as string | undefined;
+
+      if (bookingIdFromResponse) {
+        setConfirmationDetails({
+          bookingId: bookingIdFromResponse,
+          firstName: reservation.customer?.firstName || form.firstName.trim(),
+          lastName: reservation.customer?.lastName || form.lastName.trim(),
+          vehicleMake: reservation.vehicle?.make || selectedVehicle?.make || "",
+          vehicleModel: reservation.vehicle?.model || selectedVehicle?.model || "",
+          vehiclePlate: reservation.vehicle?.plateNumber || selectedVehicle?.plateNumber || "",
+          pickupDatetime: reservation.pickupDatetime || form.pickupDatetime,
+          returnDatetime: reservation.returnDatetime || form.returnDatetime,
+          pickupLocation,
+          total: Number(reservation.totalAmount || pricePreview?.total || 0),
+          paymentReference: paymentIntentId,
+          emailMessage: confirmationEmailMessage,
+          smsMessage: confirmationSmsMessage,
+          deletionToken,
+          manageToken,
+        });
+      }
+
+      setForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        addressLine: "",
+        city: "",
+        state: "",
+        zip: "",
+        driversLicenseNo: "",
+        dateOfBirth: "",
+        pickupDatetime: "",
+        returnDatetime: "",
+        vehicleId: "",
+        paymentReference: "",
+        paymentConfirmed: false,
+      });
+      setPaymentForm({
+        cardholderName: "",
+        cardNumber: "",
+        expiry: "",
+        cvv: "",
+      });
+      setTermsChecks({
+        accuracy: false,
+        agreement: false,
+        authorization: false,
+        esign: false,
+      });
+      setCommunicationChecks({
+        smsConsent: false,
+      });
+      setLookupMessage("");
+      setPaymentMessage(`Payment confirmed. Reference: ${paymentIntentId}`);
+      setIdentityVerificationComplete(false);
+      setPendingIdentityBookingId(null);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Your payment was processed, but the booking could not be confirmed yet."));
+      setFieldErrors((prev) => ({
+        ...prev,
+        paymentStatus: "Your payment was processed, but the booking could not be confirmed yet.",
+      }));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleStripePaymentError = (error: string) => {
@@ -1414,20 +1541,10 @@ export default function ReservePage() {
       return;
     }
 
-    // Trigger Stripe payment before submitting reservation
-    if (confirmPaymentRef.current) {
-      try {
-        await confirmPaymentRef.current();
-      } catch (paymentError) {
-        // Payment failed, error already handled by handleStripePaymentError
-        return;
-      }
-    }
-
     try {
       setSubmitting(true);
 
-      const res = await api.post("/public/reservations", {
+      const res = await api.post("/public/reservations/identity-session", {
         customer: {
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
@@ -1439,91 +1556,35 @@ export default function ReservePage() {
           zip: form.zip.trim(),
           driversLicenseNo: form.driversLicenseNo.trim(),
           dateOfBirth: form.dateOfBirth,
+          smsConsent: communicationChecks.smsConsent,
         },
         vehicleId: Number(form.vehicleId),
         pickupDatetime: new Date(form.pickupDatetime).toISOString(),
         returnDatetime: new Date(form.returnDatetime).toISOString(),
-        paymentStatus: "paid",
+        paymentStatus: "unpaid",
         paymentReference: form.paymentReference.trim(),
+        returnUrl: `${window.location.origin}/reserve?identity=done`,
       });
 
-      const bookingId = res.data?.data?.id;
-      const confirmationEmailMessage =
-        res.data?.data?.confirmationEmail?.message;
-      const confirmationSmsMessage = res.data?.data?.confirmationSms?.message;
-        const confirmationEmailLinks = res.data?.data?.confirmationEmail?.links;
-        const confirmationSmsLinks = res.data?.data?.confirmationSms?.links;
-        const manageToken =
-          confirmationEmailLinks?.token ||
-          confirmationSmsLinks?.token ||
-          extractManageTokenFromUrl(confirmationEmailLinks?.manageUrl) ||
-          extractManageTokenFromUrl(confirmationEmailLinks?.modifyUrl) ||
-          extractManageTokenFromUrl(confirmationEmailLinks?.cancelUrl) ||
-          extractManageTokenFromUrl(confirmationSmsLinks?.manageUrl) ||
-          extractManageTokenFromUrl(confirmationSmsLinks?.modifyUrl) ||
-          extractManageTokenFromUrl(confirmationSmsLinks?.cancelUrl) ||
-          (res.data?.data?.manageToken as string | undefined);
-        const deletionToken = res.data?.data?.deletionToken as string | undefined;
-
-      if (bookingId && selectedVehicle && pricePreview) {
-        setConfirmationDetails({
-          bookingId,
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          vehicleMake: selectedVehicle.make,
-          vehicleModel: selectedVehicle.model,
-          vehiclePlate: selectedVehicle.plateNumber ?? "",
-          pickupDatetime: form.pickupDatetime,
-          returnDatetime: form.returnDatetime,
-          pickupLocation,
-          total: pricePreview.total,
-          paymentReference: form.paymentReference.trim(),
-          emailMessage: confirmationEmailMessage,
-          smsMessage: confirmationSmsMessage,
-          deletionToken,
-          manageToken,
-        });
+      const identitySessionUrl = res.data?.data?.identitySession?.url;
+      if (!identitySessionUrl) {
+        throw new Error("Stripe Identity could not be started. Please try again.");
       }
 
-      setForm({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        addressLine: "",
-        city: "",
-        state: "",
-        zip: "",
-        driversLicenseNo: "",
-        dateOfBirth: "",
-        pickupDatetime: "",
-        returnDatetime: "",
-        vehicleId: "",
-        paymentReference: "",
-        paymentConfirmed: false,
-      });
-      setPaymentForm({
-        cardholderName: "",
-        cardNumber: "",
-        expiry: "",
-        cvv: "",
-      });
-      setTermsChecks({
-        accuracy: false,
-        agreement: false,
-        authorization: false,
-        esign: false,
-      });
-      setLookupMessage("");
-      setPaymentMessage("");
-      setVehicles([]);
+      window.location.href = identitySessionUrl;
+      return;
     } catch (err: unknown) {
       const responseErrors =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { errors?: FieldErrors } } }).response
               ?.data?.errors || {}
           : {};
-      setError(getApiErrorMessage(err, "Failed to submit reservation"));
+      setError(
+        getApiErrorMessage(
+          err,
+          "Stripe Identity could not be started. Your reservation was not confirmed."
+        )
+      );
       setFieldErrors(responseErrors);
     } finally {
       setSubmitting(false);
@@ -2400,6 +2461,11 @@ export default function ReservePage() {
                     className="md:col-span-2 xl:col-span-4 animate-stagger"
                     style={{ "--anim-delay": "140ms" } as React.CSSProperties}
                   >
+<div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                      {identityVerificationComplete
+                        ? "Identity verification is complete. Complete payment below to confirm your reservation."
+                        : "Identity verification is required before payment and booking confirmation can proceed."}
+                    </div>
                     <StripePaymentForm
                       amount={pricePreview?.total || 0}
                       onSuccess={handleStripePaymentSuccess}
@@ -2407,7 +2473,7 @@ export default function ReservePage() {
                       onPaymentReady={handlePaymentReady}
                       customerEmail={form.email}
                       customerName={`${form.firstName} ${form.lastName}`.trim()}
-                      disabled={!pricePreview || !form.firstName || !form.lastName || !form.email}
+                      disabled={!identityVerificationComplete || !pricePreview || !form.firstName || !form.lastName || !form.email}
                     />
 
                     {paymentMessage && (
@@ -2471,6 +2537,34 @@ export default function ReservePage() {
                       <label className="flex items-start gap-2 text-sm text-zinc-800">
                         <input
                           type="checkbox"
+                          checked={communicationChecks.smsConsent}
+                          onChange={(e) => {
+                            setCommunicationChecks({
+                              smsConsent: e.target.checked,
+                            });
+                          }}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          I agree to receive transactional SMS updates about my
+                          reservation at the phone number above. Message frequency
+                          varies. Message and data rates may apply. Reply STOP to
+                          opt out. See our{" "}
+                          <a
+                            href="/privacy-policy"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-medium text-blue-700 underline hover:text-blue-800"
+                          >
+                            Privacy Policy
+                          </a>
+                          .
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-2 text-sm text-zinc-800">
+                        <input
+                          type="checkbox"
                           checked={termsChecks.accuracy}
                           onChange={(e) => {
                             setTermsChecks((prev) => ({
@@ -2502,8 +2596,19 @@ export default function ReservePage() {
                           }}
                           className="mt-0.5"
                         />
-                        I have read and agree to the Georgia Vehicle Rental
-                        Terms and Conditions.
+                        <span>
+                          I have read and agree to the Georgia Vehicle Rental{" "}
+                          <a
+                            href="/terms-and-conditions"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-medium text-blue-700 underline hover:text-blue-800"
+                          >
+                            Terms and Conditions
+                          </a>
+                          .
+                        </span>
                       </label>
                       <label className="flex items-start gap-2 text-sm text-zinc-800">
                         <input
@@ -2557,6 +2662,9 @@ export default function ReservePage() {
                       Please select a vehicle and valid pickup/return dates to see the Reservation Preview before confirming.
                     </p>
                   )}
+                  <div className="md:col-span-2 xl:col-span-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    Identity verification is required before your reservation can be confirmed. If verification is incomplete, rejected, or fails, your booking will stay pending and we will show you the reason why it cannot be confirmed. If Stripe Identity cannot be started, your reservation will stop here and no booking will be confirmed.
+                  </div>
                   <button
                     type="submit"
                     disabled={
@@ -2567,14 +2675,13 @@ export default function ReservePage() {
                       !selectedVehicle ||
                       !form.pickupDatetime ||
                       !form.returnDatetime ||
-                      !pricePreview ||
-                      !confirmPaymentRef.current
+                      !pricePreview
                     }
                     className="attention-bounce md:col-span-2 xl:col-span-4 w-full rounded-xl bg-[#2f66e8] px-4 py-3 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2257d6] disabled:opacity-60"
                   >
                     {submitting
-                      ? "Processing Payment & Reservation..."
-                      : "Confirm Reservation"}
+                      ? "Starting Identity Verification..."
+                      : "Continue to Identity Verification"}
                   </button>
                 </>
               )}
@@ -2848,5 +2955,13 @@ export default function ReservePage() {
 
         </div>
       </main>
+  );
+}
+
+export default function ReservePage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen" />}>
+      <ReservePageContent />
+    </Suspense>
   );
 }

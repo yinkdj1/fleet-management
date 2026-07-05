@@ -88,6 +88,60 @@ type ModifyConfirmation = {
   vehicleLabel: string;
 };
 
+const DEFAULT_SUPPORT_EMAIL = "support@carsgidi.com";
+const DEFAULT_SUPPORT_PHONE = "+1 (470) 238-2358";
+
+function isWithin24HourPickupCutoff(pickupDatetime: string, now = new Date()) {
+  if (!pickupDatetime) return false;
+
+  const pickup = new Date(pickupDatetime);
+  if (Number.isNaN(pickup.getTime())) return false;
+
+  return pickup.getTime() - now.getTime() <= 24 * 60 * 60 * 1000;
+}
+
+function getSupportContactDetails(error?: unknown) {
+  const responseData =
+    typeof error === "object" && error !== null && "response" in error
+      ? (error as { response?: { data?: { errors?: Record<string, unknown> } } }).response?.data
+      : undefined;
+  const errors = responseData?.errors || {};
+  const supportEmail = String(
+    errors.supportEmail || errors.support_email || DEFAULT_SUPPORT_EMAIL,
+  )
+    .trim()
+    .replace(/\s+/g, " ");
+  const supportPhone = String(
+    errors.supportPhone || errors.support_phone || DEFAULT_SUPPORT_PHONE,
+  )
+    .trim()
+    .replace(/\s+/g, " ");
+
+  return {
+    supportEmail,
+    supportPhone,
+    contactSupport: Boolean(
+      errors.contactSupport || errors.supportContact || errors.supportEmail || errors.supportPhone,
+    ),
+  };
+}
+
+function getSupportNotice(error: unknown, fallbackMessage = "") {
+  const responseData =
+    typeof error === "object" && error !== null && "response" in error
+      ? (error as { response?: { data?: { message?: string } } }).response?.data
+      : undefined;
+  const message = responseData?.message || fallbackMessage;
+  const { supportEmail, supportPhone, contactSupport } = getSupportContactDetails(error);
+  const isCutoffNotice = contactSupport || /24 hours/i.test(message || "");
+
+  if (!isCutoffNotice) {
+    return message || fallbackMessage;
+  }
+
+  return `${message || "This booking can no longer be modified or cancelled online."} Please contact support for assistance. Email ${supportEmail} or call ${supportPhone}.`;
+}
+
 function toInputDatetime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -140,7 +194,15 @@ export default function GuestManageBookingPage() {
   const [globalProtectionPlanFeePerDay, setGlobalProtectionPlanFeePerDay] =
     useState(PROTECTION_PLAN_FEE_PER_DAY);
 
-  const canEdit = useMemo(() => booking?.status === "reserved", [booking]);
+  const isPickupCutoffReached = useMemo(() => {
+    if (!booking?.pickupDatetime) return false;
+    return isWithin24HourPickupCutoff(booking.pickupDatetime);
+  }, [booking?.pickupDatetime]);
+
+  const canEdit = useMemo(
+    () => booking?.status === "reserved" && !isPickupCutoffReached,
+    [booking?.status, isPickupCutoffReached],
+  );
 
   const loadBooking = async () => {
     try {
@@ -152,10 +214,8 @@ export default function GuestManageBookingPage() {
       setPickupDatetime(toInputDatetime(data?.pickupDatetime || ""));
       setReturnDatetime(toInputDatetime(data?.returnDatetime || ""));
       setSelectedVehicleId(String(data?.vehicle?.id || ""));
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message || "Invalid or expired booking link.",
-      );
+    } catch (err: unknown) {
+      setError(getSupportNotice(err, "Invalid or expired booking link."));
     } finally {
       setLoading(false);
     }
@@ -386,8 +446,8 @@ export default function GuestManageBookingPage() {
       });
       setIsModifyConfirmationOpen(true);
       await loadBooking();
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Unable to modify booking.");
+    } catch (err: unknown) {
+      setError(getSupportNotice(err, "Unable to modify booking."));
     } finally {
       setSaving(false);
     }
@@ -410,8 +470,8 @@ export default function GuestManageBookingPage() {
       );
       setBooking(null);
       setRedirectSeconds(8);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Unable to cancel booking.");
+    } catch (err: unknown) {
+      setError(getSupportNotice(err, "Unable to cancel booking."));
     } finally {
       setCancelling(false);
     }
@@ -693,9 +753,15 @@ export default function GuestManageBookingPage() {
         {booking && !canEdit && (
           <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-zinc-700">
-              This booking can no longer be modified or cancelled from this
-              link.
+              {isPickupCutoffReached
+                ? "This booking is within 24 hours of pickup, so it can no longer be modified or cancelled online."
+                : "This booking can no longer be modified or cancelled from this link."}
             </p>
+            {isPickupCutoffReached && (
+              <p className="mt-2 text-sm text-zinc-600">
+                Please contact support for assistance. Email {DEFAULT_SUPPORT_EMAIL} or call {DEFAULT_SUPPORT_PHONE}.
+              </p>
+            )}
           </section>
         )}
 

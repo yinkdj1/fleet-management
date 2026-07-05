@@ -48,7 +48,7 @@ async function sendPickupCheckinNotifications(booking) {
       text: body,
     });
   }
-  if (booking.customer?.phone && hasTwilioSmsConfig()) {
+  if (booking.customer?.phone && hasTwilioSmsConfig() && await hasBookingSmsConsent(booking.id)) {
     const client = getTwilioClient();
     const body = smsTemplate
       ? renderSmsTemplate(smsTemplate.body, booking, links)
@@ -101,7 +101,7 @@ async function sendMidwayCheckinNotifications(booking) {
       text: body || defaultExtendText,
     });
   }
-  if (booking.customer?.phone && hasTwilioSmsConfig()) {
+  if (booking.customer?.phone && hasTwilioSmsConfig() && await hasBookingSmsConsent(booking.id)) {
     const client = getTwilioClient();
     const body = smsTemplate
       ? renderSmsTemplate(smsTemplate.body, booking, links)
@@ -139,7 +139,7 @@ async function sendDropoffThankYouNotifications(booking) {
       text: body,
     });
   }
-  if (booking.customer?.phone && hasTwilioSmsConfig()) {
+  if (booking.customer?.phone && hasTwilioSmsConfig() && await hasBookingSmsConsent(booking.id)) {
     const client = getTwilioClient();
     const body = smsTemplate
       ? renderSmsTemplate(smsTemplate.body, booking, links)
@@ -206,9 +206,11 @@ const { hasSmtpConfig, sendEmail } = require("./emailService");
 const { getDiscountSettings } = require("./discountSettingsService");
 const { listNotificationTemplates } = require("./notificationTemplateService");
 const { calculateDynamicPrice } = require("./dynamicPricingService");
+const { createIdentitySession, isBookingIdentityVerified } = require("./stripeIdentityService");
 const twilio = require("twilio");
 
 const PRECHECKOUT_AUTO_MARKER_TYPE = "precheckout_prompt_auto_sent";
+const SMS_CONSENT_DOCUMENT_TYPE = "sms_consent";
 let twilioClient;
 
 const CHECKOUT_SAFE_INCLUDE = {
@@ -241,6 +243,13 @@ function buildAppError(message, statusCode = 400, errors = null) {
   error.statusCode = statusCode;
   if (errors) error.errors = errors;
   return error;
+}
+
+function getSupportContactDetails() {
+  return {
+    supportEmail: process.env.SUPPORT_EMAIL || "support@carsgidi.com",
+    supportPhone: process.env.SUPPORT_PHONE || "+1 (470) 238-2358",
+  };
 }
 
 function getJwtSecret() {
@@ -397,6 +406,51 @@ function getTwilioClient() {
   }
 
   return twilioClient;
+}
+
+async function hasBookingSmsConsent(bookingId) {
+  if (!bookingId) return false;
+
+  const marker = await prisma.document.findFirst({
+    where: {
+      bookingId: Number(bookingId),
+      documentType: SMS_CONSENT_DOCUMENT_TYPE,
+    },
+    select: { id: true },
+  });
+
+  return Boolean(marker);
+}
+
+async function recordBookingSmsConsent(booking, customer = {}) {
+  if (!booking?.id || !customer?.smsConsent) {
+    return;
+  }
+
+  const existingMarker = await prisma.document.findFirst({
+    where: {
+      bookingId: Number(booking.id),
+      documentType: SMS_CONSENT_DOCUMENT_TYPE,
+    },
+    select: { id: true },
+  });
+
+  if (existingMarker) {
+    return;
+  }
+
+  await prisma.document.create({
+    data: {
+      bookingId: Number(booking.id),
+      customerId: booking.customerId ? Number(booking.customerId) : null,
+      documentType: SMS_CONSENT_DOCUMENT_TYPE,
+      fileUrl: JSON.stringify({
+        source: "public_reservation",
+        phone: normalizePhone(customer.phone || booking.customer?.phone),
+        consentedAt: new Date().toISOString(),
+      }),
+    },
+  });
 }
 
 function getMinimumAllowedDateOfBirth(today = new Date()) {
@@ -693,6 +747,7 @@ async function getBookings(filters = {}) {
         vehicle: true,
         checkout: CHECKOUT_SAFE_INCLUDE,
         checkin: CHECKIN_SAFE_INCLUDE,
+        documents: true,
       },
       orderBy: {
         id: "desc",
@@ -859,13 +914,12 @@ function validatePublicReservationPayload(data = {}) {
     errors.returnDatetime = "Return datetime is required";
   }
 
-  if (data.paymentStatus !== "paid") {
-    errors.paymentStatus = "Payment must be completed before confirming reservation";
+  if (data.paymentStatus) {
+    const normalizedPaymentStatus = String(data.paymentStatus).trim().toLowerCase();
+    if (!["unpaid", "pending", "paid"].includes(normalizedPaymentStatus)) {
+      errors.paymentStatus = "Payment status is invalid";
+    }
   }
-
-  // paymentReference is optional - Stripe payment intent ID
-  // It's provided after successful payment but not required for validation
-  // The paymentStatus check above is sufficient
 
   if (Object.keys(errors).length > 0) {
     throw buildAppError("Validation failed", 400, errors);
@@ -1148,6 +1202,16 @@ async function sendReservationConfirmationSms(booking) {
     };
   }
 
+  if (!await hasBookingSmsConsent(booking?.id)) {
+    console.log(`[SMS] Skipped — no SMS consent recorded for booking #${booking?.id}`);
+    return {
+      sent: false,
+      reason: "sms_consent_missing",
+      message: "Reservation created. SMS confirmation skipped because SMS consent was not provided.",
+      links: null,
+    };
+  }
+
   const links = buildGuestManageLinks(booking);
   const vehicleLabel = `${booking.vehicle?.make || ""} ${booking.vehicle?.model || ""}`.trim();
   const plateNumber = booking.vehicle?.plateNumber || "N/A";
@@ -1355,7 +1419,7 @@ async function sendReservationCancellationEmail(booking) {
   }
 }
 
-async function createPublicReservation(data) {
+async function createPublicReservationDraft(data) {
   validatePublicReservationPayload(data);
 
   const customer = await findOrCreatePublicCustomer(data.customer || {});
@@ -1365,18 +1429,99 @@ async function createPublicReservation(data) {
     vehicleId: data.vehicleId,
     pickupDatetime: data.pickupDatetime,
     returnDatetime: data.returnDatetime,
-    status: "reserved",
-    paymentStatus: "paid",
+    status: "draft",
+    paymentStatus: data.paymentStatus || "unpaid",
   });
 
-  // Send email first, then send SMS; include actual delivery results in the response.
+  return {
+    ...booking,
+    identityRequired: true,
+  };
+}
+
+async function createPublicReservationIdentitySession(data = {}) {
+  const booking = await createPublicReservationDraft(data);
+
+  const baseUrl = String(
+    data.returnUrl ||
+      `${process.env.FRONTEND_URL || "https://fleet-management-bay-ten.vercel.app"}/reserve?identity=done`
+  ).trim();
+  const returnUrl = new URL(baseUrl, process.env.FRONTEND_URL || "https://fleet-management-bay-ten.vercel.app");
+  returnUrl.searchParams.set("bookingId", String(booking.id));
+
+  let identitySession;
+  try {
+    identitySession = await createIdentitySession(booking.id, returnUrl.toString());
+  } catch (error) {
+    await prisma.booking.delete({ where: { id: booking.id } }).catch(() => {});
+    throw error;
+  }
+
+  if (!identitySession?.url) {
+    await prisma.booking.delete({ where: { id: booking.id } }).catch(() => {});
+    throw buildAppError("Stripe Identity verification could not be started. Please try again.", 502);
+  }
+
+  await recordBookingSmsConsent(booking, data.customer || {});
+
+  return {
+    bookingId: booking.id,
+    booking,
+    identitySession,
+  };
+}
+
+async function finalizePublicReservation(bookingId, data = {}) {
+  const existingBooking = await prisma.booking.findUnique({
+    where: { id: Number(bookingId) },
+    include: {
+      customer: true,
+      vehicle: true,
+    },
+  });
+
+  if (!existingBooking) {
+    throw buildAppError("Booking not found", 404);
+  }
+
+  if (existingBooking.status !== "draft") {
+    return {
+      ...existingBooking,
+      identityVerified: await isBookingIdentityVerified(existingBooking.id),
+    };
+  }
+
+  const identityVerified = await isBookingIdentityVerified(existingBooking.id);
+  if (!identityVerified) {
+    throw buildAppError(
+      "Identity verification was not completed successfully, so this booking cannot be confirmed yet.",
+      409,
+      {
+        identityVerificationRequired: true,
+      }
+    );
+  }
+
+  const booking = await prisma.booking.update({
+    where: { id: Number(bookingId) },
+    data: {
+      status: "reserved",
+      paymentStatus: data.paymentStatus || "paid",
+    },
+    include: {
+      customer: true,
+      vehicle: true,
+    },
+  });
+
+  await syncVehicleStatusOnBookingStatusChange(booking.vehicleId, booking.status);
+
   const emailResult = await sendReservationConfirmationEmail(booking).catch((err) => {
     console.error("Failed to send confirmation email:", err?.message || err);
     return {
       sent: false,
       reason: err?.code || "email_error",
-      message:
-        err?.message || "Reservation created, but confirmation email failed.",
+      message: err?.message || "Reservation created, but confirmation email failed.",
       links: null,
     };
   });
@@ -1386,8 +1531,7 @@ async function createPublicReservation(data) {
     return {
       sent: false,
       reason: err?.code || "sms_error",
-      message:
-        err?.message || "Reservation created, but confirmation SMS failed.",
+      message: err?.message || "Reservation created, but confirmation SMS failed.",
       links: emailResult?.links ?? null,
     };
   });
@@ -1396,7 +1540,16 @@ async function createPublicReservation(data) {
     ...booking,
     confirmationEmail: emailResult,
     confirmationSms: smsResult,
+    identityVerified: true,
   };
+}
+
+async function createPublicReservation(data) {
+  throw buildAppError(
+    "Direct reservation creation is not allowed. Identity verification is required. Please use the identity-session endpoint.",
+    403,
+    { identityVerificationRequired: true }
+  );
 }
 
 function verifyGuestManageToken(token) {
@@ -1437,9 +1590,15 @@ async function getBookingByManageToken(token) {
   }
 
   if (isWithinGuestManageCutoff(booking.pickupDatetime)) {
+    const { supportEmail, supportPhone } = getSupportContactDetails();
     throw buildAppError(
-      "Modify and cancel links are no longer available within 24 hours of pickup",
-      403
+      "Reservations within 24 hours of pickup cannot be modified or cancelled online. Please contact support for assistance.",
+      403,
+      {
+        contactSupport: true,
+        supportEmail,
+        supportPhone,
+      }
     );
   }
 
@@ -1882,7 +2041,13 @@ async function getPrecheckoutBookingByToken(token) {
     throw buildAppError("Pre-checkout token no longer matches booking guest", 403);
   }
 
-  return booking;
+  const identityVerified = await isBookingIdentityVerified(booking.id);
+
+  return {
+    ...booking,
+    identityVerified,
+    identityVerificationRequired: true,
+  };
 }
 
 async function uploadPrecheckoutGuestDocument(token, documentKind, file) {
@@ -1968,6 +2133,18 @@ async function getPublicBookingByIdForGuest(id, guest = {}) {
 
 async function checkoutBookingPublic(id, data, photos = [], guest = {}) {
   await getPublicBookingByIdForGuest(id, guest);
+
+  const identityVerified = await isBookingIdentityVerified(id);
+  if (!identityVerified) {
+    throw buildAppError(
+      "Identity verification is required before pickup. Please complete the Stripe Identity step first.",
+      403,
+      {
+        identityVerificationRequired: true,
+      }
+    );
+  }
+
   return checkoutBooking(id, data, photos);
 }
 
@@ -2479,6 +2656,9 @@ module.exports = {
   getBookingById,
   createBooking,
   createPublicReservation,
+  createPublicReservationDraft,
+  createPublicReservationIdentitySession,
+  finalizePublicReservation,
   createGuestPrecheckoutLink,
   processAutomaticPrecheckoutPrompts,
   getPrecheckoutBookingByToken,

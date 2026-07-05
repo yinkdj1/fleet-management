@@ -35,6 +35,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {children}
+        <footer className="mt-auto border-t border-zinc-200 bg-white px-4 py-4 text-center text-zinc-600">
+          <p className="text-sm">Carsgidi is operated by Dekaz LLC</p>
+          <p className="text-xs">2026 &reg;</p>
+        </footer>
         <ChatWidget />
       </body>
     </html>

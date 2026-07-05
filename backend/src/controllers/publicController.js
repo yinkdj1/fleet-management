@@ -364,6 +364,24 @@ async function createPublicReservation(req, res, next) {
   }
 }
 
+async function createPublicReservationIdentitySession(req, res, next) {
+  try {
+    const reservation = await bookingService.createPublicReservationIdentitySession(req.body);
+    res.status(201).json({ data: reservation });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function finalizePublicReservation(req, res, next) {
+  try {
+    const reservation = await bookingService.finalizePublicReservation(req.params.id, req.body);
+    res.json({ data: reservation });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function getPublicDiscountSettings(req, res, next) {
   try {
     const settings = await getDiscountSettings();
@@ -400,4 +418,6 @@ module.exports = {
   getPublicGeocodeReverse,
   createTestPayment,
   createPublicReservation,
+  createPublicReservationIdentitySession,
+  finalizePublicReservation,
 };
