@@ -89,7 +89,7 @@ type ModifyConfirmation = {
 };
 
 const DEFAULT_SUPPORT_EMAIL = "support@carsgidi.com";
-const DEFAULT_SUPPORT_PHONE = "+1 (470) 238-2358";
+const DEFAULT_SUPPORT_PHONE = "+1 (678) 672-1900";
 
 function isWithin24HourPickupCutoff(pickupDatetime: string, now = new Date()) {
   if (!pickupDatetime) return false;

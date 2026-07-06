@@ -248,7 +248,7 @@ function buildAppError(message, statusCode = 400, errors = null) {
 function getSupportContactDetails() {
   return {
     supportEmail: process.env.SUPPORT_EMAIL || "support@carsgidi.com",
-    supportPhone: process.env.SUPPORT_PHONE || "+1 (470) 238-2358",
+    supportPhone: process.env.SUPPORT_PHONE || "+1 (678) 672-1900",
   };
 }
 

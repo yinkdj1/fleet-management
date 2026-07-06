@@ -135,7 +135,7 @@ export default function PrivacyPolicyPage() {
               <p>Website: <a href="https://www.carsgidi.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://www.carsgidi.com</a></p>
               <p>Privacy Email: <a href="mailto:privacy@carsgidi.com" className="text-blue-600 hover:underline">privacy@carsgidi.com</a></p>
               <p>Support Email: <a href="mailto:support@carsgidi.com" className="text-blue-600 hover:underline">support@carsgidi.com</a></p>
-              <p>Phone: <a href="tel:+14702382358" className="text-blue-600 hover:underline">+1 (470) 238-2358</a></p>
+              <p>Phone: <a href="tel:+16786721900" className="text-blue-600 hover:underline">+1 (678) 672-1900</a></p>
             </div>
           </section>
 
