@@ -2778,10 +2778,10 @@ function ReservePageContent() {
                   support@carsgidi.com
                 </a>
                 <a
-                  href="tel:+14702382358"
+                  href="tel:+16786721900"
                   className="mt-1 block text-xs text-slate-300 hover:text-white"
                 >
-                  +1 (470) 238-2358
+                  +1 (678) 672-1900
                 </a>
               </div>
             </div>
