@@ -1,3 +1,17 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Carsgidi Privacy Policy",
+  description: "Read Carsgidi's Privacy Policy covering data collection, SMS consent, information sharing, and your privacy rights.",
+  alternates: {
+    canonical: "/privacy-policy",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
 export default function PrivacyPolicyPage() {
   return (
     <main className="min-h-screen bg-zinc-50 py-12 px-4">
