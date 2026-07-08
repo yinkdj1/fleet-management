@@ -1,3 +1,17 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Carsgidi Terms & Conditions",
+  description: "Read Carsgidi's Terms & Conditions, including Georgia rental terms, payments, SMS communications, and driver requirements.",
+  alternates: {
+    canonical: "/terms-and-conditions",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
 export default function TermsAndConditionsPage() {
   return (
     <main className="min-h-screen bg-zinc-50 py-12 px-4">
