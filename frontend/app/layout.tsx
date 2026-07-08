@@ -14,9 +14,18 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.carsgidi.com"),
   title: "Carsgidi",
   description: "Carsgidi car rental platform",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
   alternates: {
     canonical: "/",
   },
+  verification: {},
   icons: [
     { rel: "icon", url: "/Favi.png", type: "image/png" },
     { rel: "apple-touch-icon", url: "/Favi.png" },
