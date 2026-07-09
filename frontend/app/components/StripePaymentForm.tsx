@@ -31,9 +31,10 @@ type CheckoutFormProps = {
   onSuccess: (paymentIntentId: string) => void;
   onError: (error: string) => void;
   onPaymentReady?: (confirmPayment: () => Promise<void>) => void;
+  bookingId?: number;
 };
 
-function CheckoutForm({ amount, onSuccess, onError, onPaymentReady }: CheckoutFormProps) {
+function CheckoutForm({ amount, onSuccess, onError, onPaymentReady, bookingId }: CheckoutFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -61,7 +62,10 @@ function CheckoutForm({ amount, onSuccess, onError, onPaymentReady }: CheckoutFo
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/reserve`,
+          return_url:
+            bookingId && Number(bookingId) > 0
+              ? `${window.location.origin}/reserve?identity=done&bookingId=${bookingId}&stripePayment=return`
+              : `${window.location.origin}/reserve`,
         },
         redirect: "if_required",
       });
@@ -326,7 +330,13 @@ export default function StripePaymentForm({
         </button>
 
         <Elements stripe={stripePromise} options={{ clientSecret, appearance }}>
-          <CheckoutForm amount={amount} onSuccess={onSuccess} onError={onError} onPaymentReady={onPaymentReady} />
+          <CheckoutForm
+            amount={amount}
+            onSuccess={onSuccess}
+            onError={onError}
+            onPaymentReady={onPaymentReady}
+            bookingId={bookingId}
+          />
         </Elements>
       </div>
     </div>
