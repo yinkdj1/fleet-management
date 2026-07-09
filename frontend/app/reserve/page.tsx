@@ -149,6 +149,18 @@ type CommunicationChecks = {
   smsConsent: boolean;
 };
 
+type IdentityReturnDraft = {
+  bookingId: number;
+  form: ReservationForm;
+  termsChecks: TermsChecks;
+  communicationChecks: CommunicationChecks;
+  showVehicleList: boolean;
+  savedAt: string;
+};
+
+const IDENTITY_RETURN_DRAFT_KEY = "reserve.identityReturnDraft.v1";
+const IDENTITY_RETURN_DRAFT_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+
 type FieldErrors = Partial<
   Record<
     | "firstName"
@@ -639,6 +651,32 @@ function ReservePageContent() {
   const [loadingAddressSuggestions, setLoadingAddressSuggestions] = useState(false);
   const [activeAddressSuggestionIndex, setActiveAddressSuggestionIndex] = useState(-1);
 
+  const persistIdentityReturnDraft = (bookingId: number) => {
+    if (!bookingId || bookingId <= 0) return;
+
+    const draftToRestore: IdentityReturnDraft = {
+      bookingId,
+      form: {
+        ...form,
+        paymentReference: "",
+        paymentConfirmed: false,
+      },
+      termsChecks,
+      communicationChecks,
+      showVehicleList: true,
+      savedAt: new Date().toISOString(),
+    };
+
+    try {
+      window.sessionStorage.setItem(
+        IDENTITY_RETURN_DRAFT_KEY,
+        JSON.stringify(draftToRestore)
+      );
+    } catch {
+      // Continue even if session storage is unavailable.
+    }
+  };
+
   useEffect(() => {
     setMaxDateOfBirth(formatDateForInput(getMinimumAllowedDateOfBirth()));
   }, []);
@@ -646,15 +684,63 @@ function ReservePageContent() {
   useEffect(() => {
     const bookingId = searchParams.get("bookingId");
     const identityStatus = searchParams.get("identity");
+    const checkoutStatus = searchParams.get("stripeCheckout");
 
-    if (identityStatus === "done" && bookingId) {
+    if ((identityStatus === "done" || checkoutStatus) && bookingId) {
+      const parsedBookingId = Number(bookingId);
+
+      try {
+        const rawDraft = window.sessionStorage.getItem(IDENTITY_RETURN_DRAFT_KEY);
+
+        if (rawDraft) {
+          const draft = JSON.parse(rawDraft) as Partial<IdentityReturnDraft>;
+          const draftTimestamp = draft.savedAt ? new Date(draft.savedAt).getTime() : 0;
+          const isFreshDraft =
+            Number.isFinite(draftTimestamp) &&
+            Date.now() - draftTimestamp <= IDENTITY_RETURN_DRAFT_MAX_AGE_MS;
+
+          if (isFreshDraft && Number(draft.bookingId) === parsedBookingId && draft.form) {
+            setForm((prev) => ({
+              ...prev,
+              ...draft.form,
+              paymentReference: "",
+              paymentConfirmed: false,
+            }));
+            setTermsChecks((prev) => ({
+              ...prev,
+              ...(draft.termsChecks || {}),
+            }));
+            setCommunicationChecks((prev) => ({
+              ...prev,
+              ...(draft.communicationChecks || {}),
+            }));
+            setShowVehicleList(
+              Boolean(
+                draft.showVehicleList ||
+                  (draft.form.pickupDatetime && draft.form.returnDatetime)
+              )
+            );
+          }
+
+          if (!isFreshDraft || checkoutStatus) {
+            window.sessionStorage.removeItem(IDENTITY_RETURN_DRAFT_KEY);
+          }
+        }
+      } catch {
+        window.sessionStorage.removeItem(IDENTITY_RETURN_DRAFT_KEY);
+      }
+
       setIdentityVerificationComplete(true);
-      setPendingIdentityBookingId(Number(bookingId));
-      setPaymentMessage("Identity verified. Complete payment to confirm your reservation.");
+      setPendingIdentityBookingId(parsedBookingId);
+      if (checkoutStatus === "cancelled") {
+        setPaymentMessage("Stripe checkout was cancelled. You can continue payment below.");
+      } else {
+        setPaymentMessage("Identity verified. Complete payment to confirm your reservation.");
+      }
       setError("");
       router.replace("/reserve");
     }
-  }, [pickupLocation, router, searchParams]);
+  }, [router, searchParams]);
 
   useEffect(() => {
     const query = form.addressLine.trim();
@@ -1571,6 +1657,9 @@ function ReservePageContent() {
         throw new Error("Stripe Identity could not be started. Please try again.");
       }
 
+      const bookingIdFromResponse = Number(res.data?.data?.bookingId || 0);
+      persistIdentityReturnDraft(bookingIdFromResponse);
+
       window.location.href = identitySessionUrl;
       return;
     } catch (err: unknown) {
@@ -2471,8 +2560,14 @@ function ReservePageContent() {
                       onSuccess={handleStripePaymentSuccess}
                       onError={handleStripePaymentError}
                       onPaymentReady={handlePaymentReady}
+                      bookingId={pendingIdentityBookingId || undefined}
                       customerEmail={form.email}
                       customerName={`${form.firstName} ${form.lastName}`.trim()}
+                      onBeforeCheckoutRedirect={() => {
+                        if (pendingIdentityBookingId) {
+                          persistIdentityReturnDraft(pendingIdentityBookingId);
+                        }
+                      }}
                       disabled={!identityVerificationComplete || !pricePreview || !form.firstName || !form.lastName || !form.email}
                     />
 

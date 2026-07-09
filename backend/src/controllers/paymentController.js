@@ -118,7 +118,14 @@ async function verifyPaymentIntent(req, res) {
  */
 async function createCheckoutSession(req, res) {
   try {
-    const { amount, bookingId, customerEmail, currency = 'usd' } = req.body;
+    const {
+      amount,
+      bookingId,
+      customerEmail,
+      currency = 'usd',
+      successUrl: requestedSuccessUrl,
+      cancelUrl: requestedCancelUrl,
+    } = req.body;
 
     if (!amount || Number(amount) <= 0) {
       return res.status(400).json({ success: false, message: 'Valid amount is required' });
@@ -129,8 +136,23 @@ async function createCheckoutSession(req, res) {
     }
 
     const origin = process.env.FRONTEND_BASE_URL || req.get('origin') || '';
-    const successUrl = `${origin}/payments/success?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${origin}/reserve?cancelled=1`;
+    const defaultSuccessUrl = `${origin}/payments/success?session_id={CHECKOUT_SESSION_ID}`;
+    const defaultCancelUrl = `${origin}/reserve?cancelled=1`;
+
+    const getSafeRedirectUrl = (candidate, fallback) => {
+      if (!candidate || typeof candidate !== 'string') return fallback;
+      try {
+        const parsed = new URL(candidate);
+        const parsedOrigin = new URL(origin);
+        if (parsed.origin !== parsedOrigin.origin) return fallback;
+        return parsed.toString();
+      } catch {
+        return fallback;
+      }
+    };
+
+    const successUrl = getSafeRedirectUrl(requestedSuccessUrl, defaultSuccessUrl);
+    const cancelUrl = getSafeRedirectUrl(requestedCancelUrl, defaultCancelUrl);
 
     const session = await createCheckoutSessionService({
       amount: Number(amount),

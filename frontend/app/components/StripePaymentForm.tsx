@@ -21,6 +21,9 @@ type PaymentFormProps = {
   bookingId?: number;
   disabled?: boolean;
   onPaymentReady?: (confirmPayment: () => Promise<void>) => void;
+  checkoutSuccessUrl?: string;
+  checkoutCancelUrl?: string;
+  onBeforeCheckoutRedirect?: () => void;
 };
 
 type CheckoutFormProps = {
@@ -144,6 +147,9 @@ export default function StripePaymentForm({
   bookingId,
   disabled = false,
   onPaymentReady,
+  checkoutSuccessUrl,
+  checkoutCancelUrl,
+  onBeforeCheckoutRedirect,
 }: PaymentFormProps) {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -283,10 +289,24 @@ export default function StripePaymentForm({
           disabled={loading}
           onClick={async () => {
             try {
+              onBeforeCheckoutRedirect?.();
+
+              const origin = window.location.origin;
+              const defaultReturnUrl =
+                bookingId && Number(bookingId) > 0
+                  ? `${origin}/reserve?identity=done&bookingId=${bookingId}`
+                  : `${origin}/reserve`;
+
               const resp = await fetch(`${API_BASE_URL}/payments/create-checkout-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount, bookingId, customerEmail }),
+                body: JSON.stringify({
+                  amount,
+                  bookingId,
+                  customerEmail,
+                  successUrl: checkoutSuccessUrl || `${defaultReturnUrl}&stripeCheckout=success`,
+                  cancelUrl: checkoutCancelUrl || `${defaultReturnUrl}&stripeCheckout=cancelled`,
+                }),
               });
 
               const data = await resp.json();
