@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { loadStripe, Stripe, StripeElements } from "@stripe/stripe-js";
+import {
+  Elements,
+  PaymentElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
 
 // Get API base URL from environment variable or default to /api
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
@@ -19,10 +26,128 @@ type PaymentFormProps = {
   onBeforeCheckoutRedirect?: () => void;
 };
 
+type CheckoutFormProps = {
+  amount: number;
+  onSuccess: (paymentIntentId: string) => void;
+  onError: (error: string) => void;
+  onPaymentReady?: (confirmPayment: () => Promise<void>) => void;
+  bookingId?: number;
+};
+
+function CheckoutForm({ amount, onSuccess, onError, onPaymentReady, bookingId }: CheckoutFormProps) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const confirmPayment = async () => {
+    if (!stripe || !elements) {
+      const errorMsg = "Payment system not ready";
+      onError(errorMsg);
+      setMessage(errorMsg);
+      setProcessing(false);
+      throw new Error(errorMsg);
+    }
+
+    // Prevent double confirmation
+    if (processing) {
+      console.log('[StripePayment] Already processing, skipping duplicate confirmation');
+      return;
+    }
+
+    setProcessing(true);
+    setMessage(null);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url:
+            bookingId && Number(bookingId) > 0
+              ? `${window.location.origin}/reserve?identity=done&bookingId=${bookingId}&stripePayment=return`
+              : `${window.location.origin}/reserve`,
+        },
+        redirect: "if_required",
+      });
+
+      if (error) {
+        // Check if error is because payment already succeeded
+        if (error.type === 'invalid_request_error' && 
+            error.message?.includes('already succeeded')) {
+          console.log('[StripePayment] Payment already succeeded, treating as success');
+          // Extract payment intent ID from error if available
+          const piMatch = error.message.match(/pi_[a-zA-Z0-9]+/);
+          if (piMatch) {
+            onSuccess(piMatch[0]);
+            setMessage("Payment successful!");
+            setProcessing(false);
+            return;
+          }
+        }
+        
+        const errorMsg = error.message || "Payment failed";
+        onError(errorMsg);
+        setMessage(errorMsg);
+        setProcessing(false);
+        throw new Error(errorMsg);
+      } else if (paymentIntent && paymentIntent.status === "succeeded") {
+        onSuccess(paymentIntent.id);
+        setMessage("Payment successful!");
+        setProcessing(false);
+        // Success - don't throw, just return
+        return;
+      } else {
+        const errorMsg = "Payment was not completed";
+        onError(errorMsg);
+        setMessage(errorMsg);
+        setProcessing(false);
+        throw new Error(errorMsg);
+      }
+    } catch (err) {
+      // Only handle errors that haven't been handled above
+      if (err instanceof Error && !err.message.includes("Payment")) {
+        const errorMessage = "An unexpected error occurred";
+        onError(errorMessage);
+        setMessage(errorMessage);
+      }
+      setProcessing(false);
+      throw err;
+    }
+  };
+
+  // Expose confirmPayment function to parent
+  useEffect(() => {
+    if (stripe && elements && onPaymentReady) {
+      onPaymentReady(confirmPayment);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stripe, elements]);
+
+  return (
+    <div className="space-y-4">
+      <PaymentElement />
+      
+      {message && (
+        <div className={`text-sm ${message.includes("successful") ? "text-emerald-700" : "text-red-600"}`}>
+          {message}
+        </div>
+      )}
+
+      {processing && (
+        <div className="text-sm text-blue-600">
+          Processing payment...
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function StripePaymentForm({
   amount,
+  onSuccess,
   onError,
   customerEmail,
+  customerName,
   bookingId,
   disabled = false,
   onPaymentReady,
@@ -30,124 +155,80 @@ export default function StripePaymentForm({
   checkoutCancelUrl,
   onBeforeCheckoutRedirect,
 }: PaymentFormProps) {
-  const [loading, setLoading] = useState(false);
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isStripeTestMode, setIsStripeTestMode] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadStripeMode = async () => {
+    // Fetch payment config and initialize Stripe
+    const initializeStripe = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/payments/config`);
         const data = await response.json();
-        const publishableKey = String(data?.data?.stripePublishableKey || "");
-        if (isMounted) {
-          setIsStripeTestMode(publishableKey.startsWith("pk_test_"));
+
+        if (!data.success || !data.data.stripeConfigured) {
+          setError("Stripe is not configured. Please contact support.");
+          setLoading(false);
+          return;
         }
-      } catch {
-        if (isMounted) {
-          setIsStripeTestMode(false);
+
+        const publishableKey = data.data.stripePublishableKey;
+        if (!publishableKey) {
+          setError("Stripe publishable key not found.");
+          setLoading(false);
+          return;
         }
+
+        setStripePromise(loadStripe(publishableKey));
+      } catch (err) {
+        setError("Failed to initialize payment system.");
+        setLoading(false);
       }
     };
 
-    loadStripeMode();
-
-    return () => {
-      isMounted = false;
-    };
+    initializeStripe();
   }, []);
 
-  const startCheckout = useCallback(async (testScenario?: "success" | "decline") => {
-    if (disabled) {
-      const msg = "Complete all required fields to enable payment.";
-      setError(msg);
-      onError(msg);
-      throw new Error(msg);
-    }
-
-    if (!amount || amount <= 0) {
-      const msg = "Payment amount is not ready yet.";
-      setError(msg);
-      onError(msg);
-      throw new Error(msg);
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      onBeforeCheckoutRedirect?.();
-
-      const origin = window.location.origin;
-      const defaultReturnUrl =
-        bookingId && Number(bookingId) > 0
-          ? `${origin}/reserve?identity=done&bookingId=${bookingId}`
-          : `${origin}/reserve`;
-
-      const successUrl = checkoutSuccessUrl || `${defaultReturnUrl}&stripeCheckout=success`;
-      const cancelUrl = checkoutCancelUrl || `${defaultReturnUrl}&stripeCheckout=cancelled`;
-      const withScenario = (url: string) => {
-        if (!testScenario) return url;
-        const separator = url.includes("?") ? "&" : "?";
-        return `${url}${separator}stripeTestCase=${testScenario}`;
-      };
-
-      const resp = await fetch(`${API_BASE_URL}/payments/create-checkout-session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount,
-          bookingId,
-          customerEmail,
-          successUrl: withScenario(successUrl),
-          cancelUrl: withScenario(cancelUrl),
-        }),
-      });
-
-      const data = await resp.json();
-
-      if (data && data.success && data.url) {
-        window.location.href = data.url;
-        return;
-      }
-
-      const msg = data && data.message ? data.message : "Failed to create checkout session";
-      setError(msg);
-      onError(msg);
-      throw new Error(msg);
-    } catch (err) {
-      if (err instanceof Error && err.message) {
-        if (err.message !== "Failed to create checkout session") {
-          setError(err.message);
-          onError(err.message);
-        }
-        throw err;
-      }
-
-      const msg = "Failed to initiate checkout session";
-      setError(msg);
-      onError(msg);
-      throw new Error(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    amount,
-    bookingId,
-    checkoutCancelUrl,
-    checkoutSuccessUrl,
-    customerEmail,
-    disabled,
-    onBeforeCheckoutRedirect,
-    onError,
-  ]);
-
   useEffect(() => {
-    if (onPaymentReady) {
-      onPaymentReady(startCheckout);
-    }
-  }, [onPaymentReady, startCheckout]);
+    // Create payment intent when amount changes
+    if (!stripePromise || amount <= 0) return;
+
+    const createPaymentIntent = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_BASE_URL}/payments/create-intent`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            amount,
+            bookingId,
+            customerEmail,
+            customerName,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!data.success || !data.data.clientSecret) {
+          setError(data.message || "Failed to initialize payment");
+          setLoading(false);
+          return;
+        }
+
+        setClientSecret(data.data.clientSecret);
+        setError(null);
+      } catch (err) {
+        setError("Failed to create payment intent");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    createPaymentIntent();
+  }, [amount, bookingId, customerEmail, customerName, stripePromise]);
 
   if (disabled) {
     return (
@@ -155,6 +236,14 @@ export default function StripePaymentForm({
         <p className="text-sm text-slate-600">
           Complete all required fields to enable payment.
         </p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-emerald-300/40 bg-emerald-500/12 p-4">
+        <p className="text-sm text-emerald-900">Loading payment form...</p>
       </div>
     );
   }
@@ -168,66 +257,88 @@ export default function StripePaymentForm({
     );
   }
 
+  if (!stripePromise || !clientSecret) {
+    return (
+      <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
+        <p className="text-sm text-amber-900">Payment system not ready. Please try again.</p>
+      </div>
+    );
+  }
+
+  const appearance = {
+    theme: "stripe" as const,
+    variables: {
+      colorPrimary: "#10b981",
+      colorBackground: "#ffffff",
+      colorText: "#18181b",
+      colorDanger: "#ef4444",
+      fontFamily: "system-ui, sans-serif",
+      spacingUnit: "4px",
+      borderRadius: "12px",
+    },
+  };
+
   return (
     <div className="rounded-2xl border border-emerald-300/40 bg-emerald-500/12 p-4 space-y-3">
       <p className="text-sm font-semibold text-emerald-900">
         Secure Payment
       </p>
       <p className="text-xs text-emerald-800">
-        You will be redirected to Stripe Checkout to securely complete payment.
+        Your payment information is encrypted and secure.
       </p>
+      
+      <div className="space-y-3">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={async () => {
+            try {
+              onBeforeCheckoutRedirect?.();
 
-      {isStripeTestMode && (
-        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-2">
-          <p className="text-xs font-semibold text-blue-900">Sandbox test options</p>
-          <p className="text-xs text-blue-800">Choose a scenario, then use the matching test card in Stripe Checkout.</p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => {
-                startCheckout("success").catch(() => {
-                  // Error state is already surfaced via onError and local error state.
-                });
-              }}
-              disabled={loading || disabled}
-              className="rounded-md bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Simulate Success
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                startCheckout("decline").catch(() => {
-                  // Error state is already surfaced via onError and local error state.
-                });
-              }}
-              disabled={loading || disabled}
-              className="rounded-md bg-rose-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Simulate Decline
-            </button>
-          </div>
-          <div className="text-[11px] text-blue-900 space-y-0.5">
-            <p>Success card: 4242 4242 4242 4242</p>
-            <p>Decline card: 4000 0000 0000 0002</p>
-          </div>
-        </div>
-      )}
+              const origin = window.location.origin;
+              const defaultReturnUrl =
+                bookingId && Number(bookingId) > 0
+                  ? `${origin}/reserve?identity=done&bookingId=${bookingId}`
+                  : `${origin}/reserve`;
 
-      <button
-        type="button"
-        onClick={() => {
-          startCheckout().catch(() => {
-            // Error state is already surfaced via onError and local error state.
-          });
-        }}
-        disabled={loading || disabled}
-        className="w-full rounded-md bg-emerald-700 px-4 py-2 text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {loading ? "Redirecting..." : "Continue to Stripe Checkout"}
-      </button>
+              const resp = await fetch(`${API_BASE_URL}/payments/create-checkout-session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  amount,
+                  bookingId,
+                  customerEmail,
+                  successUrl: checkoutSuccessUrl || `${defaultReturnUrl}&stripeCheckout=success`,
+                  cancelUrl: checkoutCancelUrl || `${defaultReturnUrl}&stripeCheckout=cancelled`,
+                }),
+              });
 
-      {loading && <p className="text-sm text-blue-600">Redirecting to Stripe Checkout...</p>}
+              const data = await resp.json();
+              if (data && data.success && data.url) {
+                window.location.href = data.url;
+              } else {
+                const msg = data && data.message ? data.message : 'Failed to create checkout session';
+                onError(msg);
+              }
+            } catch (err) {
+              onError('Failed to initiate Checkout session');
+            }
+          }}
+          className="w-full rounded-md bg-emerald-700 px-4 py-2 text-white"
+        >
+          Pay with Stripe Checkout
+        </button>
+
+        <Elements stripe={stripePromise} options={{ clientSecret, appearance }}>
+          <CheckoutForm
+            amount={amount}
+            onSuccess={onSuccess}
+            onError={onError}
+            onPaymentReady={onPaymentReady}
+            bookingId={bookingId}
+          />
+        </Elements>
+      </div>
     </div>
   );
 }
