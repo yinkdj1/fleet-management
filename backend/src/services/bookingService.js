@@ -1544,6 +1544,35 @@ async function finalizePublicReservation(bookingId, data = {}) {
   };
 }
 
+async function getPublicReservationIdentityStatus(bookingId) {
+  const id = Number(bookingId);
+  if (!Number.isFinite(id) || id <= 0) {
+    throw buildAppError("Invalid booking id", 400);
+  }
+
+  const booking = await prisma.booking.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      paymentStatus: true,
+    },
+  });
+
+  if (!booking) {
+    throw buildAppError("Booking not found", 404);
+  }
+
+  const identityVerified = await isBookingIdentityVerified(id);
+
+  return {
+    bookingId: booking.id,
+    status: booking.status,
+    paymentStatus: booking.paymentStatus,
+    identityVerified,
+  };
+}
+
 async function createPublicReservation(data) {
   throw buildAppError(
     "Direct reservation creation is not allowed. Identity verification is required. Please use the identity-session endpoint.",
@@ -2658,6 +2687,7 @@ module.exports = {
   createPublicReservation,
   createPublicReservationDraft,
   createPublicReservationIdentitySession,
+  getPublicReservationIdentityStatus,
   finalizePublicReservation,
   createGuestPrecheckoutLink,
   processAutomaticPrecheckoutPrompts,

@@ -373,6 +373,15 @@ async function createPublicReservationIdentitySession(req, res, next) {
   }
 }
 
+async function getPublicReservationIdentityStatus(req, res, next) {
+  try {
+    const status = await bookingService.getPublicReservationIdentityStatus(req.params.id);
+    res.json({ data: status });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function finalizePublicReservation(req, res, next) {
   try {
     const reservation = await bookingService.finalizePublicReservation(req.params.id, req.body);
@@ -419,5 +428,6 @@ module.exports = {
   createTestPayment,
   createPublicReservation,
   createPublicReservationIdentitySession,
+  getPublicReservationIdentityStatus,
   finalizePublicReservation,
 };

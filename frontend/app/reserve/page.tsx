@@ -651,6 +651,11 @@ function ReservePageContent() {
   const [loadingAddressSuggestions, setLoadingAddressSuggestions] = useState(false);
   const [activeAddressSuggestionIndex, setActiveAddressSuggestionIndex] = useState(-1);
 
+  const fetchIdentityStatus = async (bookingId: number) => {
+    const response = await api.get(`/public/reservations/${bookingId}/identity-status`);
+    return Boolean(response.data?.data?.identityVerified);
+  };
+
   const persistIdentityReturnDraft = (bookingId: number) => {
     if (!bookingId || bookingId <= 0) return;
 
@@ -688,6 +693,10 @@ function ReservePageContent() {
 
     if ((identityStatus === "done" || checkoutStatus) && bookingId) {
       const parsedBookingId = Number(bookingId);
+      if (!Number.isFinite(parsedBookingId) || parsedBookingId <= 0) {
+        router.replace("/reserve");
+        return;
+      }
 
       try {
         const rawDraft = window.sessionStorage.getItem(IDENTITY_RETURN_DRAFT_KEY);
@@ -730,15 +739,37 @@ function ReservePageContent() {
         window.sessionStorage.removeItem(IDENTITY_RETURN_DRAFT_KEY);
       }
 
-      setIdentityVerificationComplete(true);
-      setPendingIdentityBookingId(parsedBookingId);
-      if (checkoutStatus === "cancelled") {
-        setPaymentMessage("Stripe checkout was cancelled. You can continue payment below.");
-      } else {
-        setPaymentMessage("Identity verified. Complete payment to confirm your reservation.");
-      }
-      setError("");
-      router.replace("/reserve");
+      (async () => {
+        try {
+          const identityVerified = await fetchIdentityStatus(parsedBookingId);
+
+          if (!identityVerified) {
+            setIdentityVerificationComplete(false);
+            setPendingIdentityBookingId(null);
+            setPaymentMessage("");
+            setError(
+              "Identity verification was not completed successfully. Please complete identity verification before payment."
+            );
+            return;
+          }
+
+          setIdentityVerificationComplete(true);
+          setPendingIdentityBookingId(parsedBookingId);
+          if (checkoutStatus === "cancelled") {
+            setPaymentMessage("Stripe checkout was cancelled. You can continue payment below.");
+          } else {
+            setPaymentMessage("Identity verified. Complete payment to confirm your reservation.");
+          }
+          setError("");
+        } catch {
+          setIdentityVerificationComplete(false);
+          setPendingIdentityBookingId(null);
+          setPaymentMessage("");
+          setError("We could not verify your identity status. Please try again.");
+        } finally {
+          router.replace("/reserve");
+        }
+      })();
     }
   }, [router, searchParams]);
 
@@ -1624,6 +1655,47 @@ function ReservePageContent() {
         zip: "Unable to validate ZIP code right now",
       }));
       setError("Please fix the highlighted fields.");
+      return;
+    }
+
+    if (identityVerificationComplete) {
+      if (!pendingIdentityBookingId) {
+        setError("Identity verification must be completed before payment can be processed.");
+        return;
+      }
+
+      try {
+        const identityVerified = await fetchIdentityStatus(pendingIdentityBookingId);
+        if (!identityVerified) {
+          setIdentityVerificationComplete(false);
+          setPendingIdentityBookingId(null);
+          setPaymentMessage("");
+          setError(
+            "Identity verification was not completed successfully. Please complete identity verification before payment."
+          );
+          return;
+        }
+      } catch {
+        setError("We could not verify your identity status. Please try again.");
+        return;
+      }
+
+      if (!confirmPaymentRef.current) {
+        setError("Payment form is still loading. Please wait a moment and try again.");
+        return;
+      }
+
+      try {
+        setSubmitting(true);
+        setPaymentMessage("Processing payment...");
+        persistIdentityReturnDraft(pendingIdentityBookingId);
+        await confirmPaymentRef.current();
+      } catch {
+        // Payment errors are surfaced by StripePaymentForm via onError.
+      } finally {
+        setSubmitting(false);
+      }
+
       return;
     }
 
@@ -2758,7 +2830,9 @@ function ReservePageContent() {
                     </p>
                   )}
                   <div className="md:col-span-2 xl:col-span-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                    Identity verification is required before your reservation can be confirmed. If verification is incomplete, rejected, or fails, your booking will stay pending and we will show you the reason why it cannot be confirmed. If Stripe Identity cannot be started, your reservation will stop here and no booking will be confirmed.
+                    {identityVerificationComplete
+                      ? "Identity verification is complete. Review your details and click Complete Booking to process payment and confirm your reservation."
+                      : "Identity verification is required before your reservation can be confirmed. If verification is incomplete, rejected, or fails, your booking will stay pending and we will show you the reason why it cannot be confirmed. If Stripe Identity cannot be started, your reservation will stop here and no booking will be confirmed."}
                   </div>
                   <button
                     type="submit"
@@ -2775,8 +2849,12 @@ function ReservePageContent() {
                     className="attention-bounce md:col-span-2 xl:col-span-4 w-full rounded-xl bg-[#2f66e8] px-4 py-3 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2257d6] disabled:opacity-60"
                   >
                     {submitting
-                      ? "Starting Identity Verification..."
-                      : "Continue to Identity Verification"}
+                      ? identityVerificationComplete
+                        ? "Completing Booking..."
+                        : "Starting Identity Verification..."
+                      : identityVerificationComplete
+                        ? "Complete Booking"
+                        : "Continue to Identity Verification"}
                   </button>
                 </>
               )}

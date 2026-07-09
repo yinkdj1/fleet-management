@@ -19,6 +19,7 @@ const {
   createTestPayment,
   createPublicReservation,
   createPublicReservationIdentitySession,
+  getPublicReservationIdentityStatus,
   finalizePublicReservation,
 } = require("../controllers/publicController");
 const upload = require("../middleware/uploadMiddleware");
@@ -107,6 +108,11 @@ router.post(
   reservationRateLimiter,
   honeypotGuard,
   createPublicReservationIdentitySession
+);
+router.get(
+  "/reservations/:id/identity-status",
+  reservationRateLimiter,
+  getPublicReservationIdentityStatus
 );
 router.post(
   "/reservations/:id/finalize-identity",
