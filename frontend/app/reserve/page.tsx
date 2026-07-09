@@ -1366,6 +1366,7 @@ function ReservePageContent() {
 
       const res = await api.post(`/public/reservations/${pendingIdentityBookingId}/finalize-identity`, {
         paymentStatus: "paid",
+        frontendBaseUrl: window.location.origin,
       });
       const reservation = res.data?.data || null;
       const bookingIdFromResponse = reservation?.id;
