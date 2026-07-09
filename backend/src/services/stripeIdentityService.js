@@ -14,6 +14,26 @@ function isStripeIdentityEnabled() {
   return Boolean(process.env.STRIPE_SECRET_KEY);
 }
 
+async function upsertVerifiedIdentityMarker(bookingId, sessionId) {
+  await prisma.document.upsert({
+    where: {
+      id: (await prisma.document.findFirst({
+        where: {
+          bookingId: Number(bookingId),
+          documentType: "stripe_identity_verified",
+        },
+        select: { id: true },
+      }))?.id ?? -1,
+    },
+    update: { fileUrl: sessionId },
+    create: {
+      bookingId: Number(bookingId),
+      documentType: "stripe_identity_verified",
+      fileUrl: sessionId,
+    },
+  });
+}
+
 /**
  * Create a Stripe Identity VerificationSession for a precheckout booking.
  * Returns { clientSecret, sessionId } to the frontend.
@@ -79,25 +99,7 @@ async function handleIdentityWebhook(rawBody, signature) {
     const bookingId = session.metadata?.bookingId;
 
     if (bookingId) {
-      // Upsert a verified marker document
-      await prisma.document.upsert({
-        where: {
-          // Use a composite unique check via findFirst + create pattern
-          id: (await prisma.document.findFirst({
-            where: {
-              bookingId: Number(bookingId),
-              documentType: "stripe_identity_verified",
-            },
-            select: { id: true },
-          }))?.id ?? -1,
-        },
-        update: { fileUrl: session.id },
-        create: {
-          bookingId: Number(bookingId),
-          documentType: "stripe_identity_verified",
-          fileUrl: session.id,
-        },
-      });
+      await upsertVerifiedIdentityMarker(bookingId, session.id);
 
       console.log(`[StripeIdentity] Booking #${bookingId} identity verified — session ${session.id}`);
     }
@@ -120,13 +122,47 @@ async function isBookingIdentityVerified(bookingId) {
     return true;
   }
 
-  const doc = await prisma.document.findFirst({
+  const verifiedDoc = await prisma.document.findFirst({
     where: {
       bookingId: Number(bookingId),
       documentType: "stripe_identity_verified",
     },
   });
-  return Boolean(doc);
+
+  if (verifiedDoc) {
+    return true;
+  }
+
+  const latestSessionDoc = await prisma.document.findFirst({
+    where: {
+      bookingId: Number(bookingId),
+      documentType: "stripe_identity_session",
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  if (!latestSessionDoc?.fileUrl) {
+    return false;
+  }
+
+  try {
+    const stripe = getStripe();
+    const session = await stripe.identity.verificationSessions.retrieve(latestSessionDoc.fileUrl);
+
+    if (session?.status === "verified") {
+      await upsertVerifiedIdentityMarker(bookingId, session.id);
+      return true;
+    }
+  } catch (error) {
+    console.warn(
+      `[StripeIdentity] Failed to verify live session status for booking #${bookingId}:`,
+      error?.message || error
+    );
+  }
+
+  return false;
 }
 
 module.exports = {
