@@ -139,7 +139,7 @@ async function isBookingIdentityVerified(bookingId) {
       documentType: "stripe_identity_session",
     },
     orderBy: {
-      createdAt: "desc",
+      uploadedAt: "desc",
     },
   });
 
