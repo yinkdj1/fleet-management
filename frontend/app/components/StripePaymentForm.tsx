@@ -32,8 +32,34 @@ export default function StripePaymentForm({
 }: PaymentFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isStripeTestMode, setIsStripeTestMode] = useState(false);
 
-  const startCheckout = useCallback(async () => {
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadStripeMode = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/payments/config`);
+        const data = await response.json();
+        const publishableKey = String(data?.data?.stripePublishableKey || "");
+        if (isMounted) {
+          setIsStripeTestMode(publishableKey.startsWith("pk_test_"));
+        }
+      } catch {
+        if (isMounted) {
+          setIsStripeTestMode(false);
+        }
+      }
+    };
+
+    loadStripeMode();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const startCheckout = useCallback(async (testScenario?: "success" | "decline") => {
     if (disabled) {
       const msg = "Complete all required fields to enable payment.";
       setError(msg);
@@ -59,6 +85,14 @@ export default function StripePaymentForm({
           ? `${origin}/reserve?identity=done&bookingId=${bookingId}`
           : `${origin}/reserve`;
 
+      const successUrl = checkoutSuccessUrl || `${defaultReturnUrl}&stripeCheckout=success`;
+      const cancelUrl = checkoutCancelUrl || `${defaultReturnUrl}&stripeCheckout=cancelled`;
+      const withScenario = (url: string) => {
+        if (!testScenario) return url;
+        const separator = url.includes("?") ? "&" : "?";
+        return `${url}${separator}stripeTestCase=${testScenario}`;
+      };
+
       const resp = await fetch(`${API_BASE_URL}/payments/create-checkout-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -66,8 +100,8 @@ export default function StripePaymentForm({
           amount,
           bookingId,
           customerEmail,
-          successUrl: checkoutSuccessUrl || `${defaultReturnUrl}&stripeCheckout=success`,
-          cancelUrl: checkoutCancelUrl || `${defaultReturnUrl}&stripeCheckout=cancelled`,
+          successUrl: withScenario(successUrl),
+          cancelUrl: withScenario(cancelUrl),
         }),
       });
 
@@ -142,6 +176,43 @@ export default function StripePaymentForm({
       <p className="text-xs text-emerald-800">
         You will be redirected to Stripe Checkout to securely complete payment.
       </p>
+
+      {isStripeTestMode && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-2">
+          <p className="text-xs font-semibold text-blue-900">Sandbox test options</p>
+          <p className="text-xs text-blue-800">Choose a scenario, then use the matching test card in Stripe Checkout.</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => {
+                startCheckout("success").catch(() => {
+                  // Error state is already surfaced via onError and local error state.
+                });
+              }}
+              disabled={loading || disabled}
+              className="rounded-md bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Simulate Success
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                startCheckout("decline").catch(() => {
+                  // Error state is already surfaced via onError and local error state.
+                });
+              }}
+              disabled={loading || disabled}
+              className="rounded-md bg-rose-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Simulate Decline
+            </button>
+          </div>
+          <div className="text-[11px] text-blue-900 space-y-0.5">
+            <p>Success card: 4242 4242 4242 4242</p>
+            <p>Decline card: 4000 0000 0000 0002</p>
+          </div>
+        </div>
+      )}
 
       <button
         type="button"
