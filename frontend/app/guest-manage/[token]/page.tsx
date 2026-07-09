@@ -602,7 +602,7 @@ export default function GuestManageBookingPage() {
             </h2>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700">
+              <label className="mb-1 block text-sm font-medium text-zinc-900">
                 Pickup
               </label>
               <input
@@ -613,14 +613,14 @@ export default function GuestManageBookingPage() {
                   setModifyConfirmation(null);
                 }}
                 min={minDatetime || undefined}
-                className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                className="w-full rounded-xl border border-zinc-300 bg-white p-3 text-zinc-900"
                 disabled={isModifyConfirmationOpen}
                 required
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700">
+              <label className="mb-1 block text-sm font-medium text-zinc-900">
                 Return
               </label>
               <input
@@ -631,14 +631,14 @@ export default function GuestManageBookingPage() {
                   setModifyConfirmation(null);
                 }}
                 min={pickupDatetime || minDatetime || undefined}
-                className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                className="w-full rounded-xl border border-zinc-300 bg-white p-3 text-zinc-900"
                 disabled={isModifyConfirmationOpen}
                 required
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700">
+              <label className="mb-1 block text-sm font-medium text-zinc-900">
                 Vehicle
               </label>
               <select
@@ -647,7 +647,7 @@ export default function GuestManageBookingPage() {
                   setSelectedVehicleId(e.target.value);
                   setModifyConfirmation(null);
                 }}
-                className="w-full rounded-xl border border-zinc-300 bg-white p-3"
+                className="w-full rounded-xl border border-zinc-300 bg-white p-3 text-zinc-900"
                 disabled={isModifyConfirmationOpen}
                 required
               >
@@ -773,7 +773,7 @@ export default function GuestManageBookingPage() {
                 Reservation {formatBookingId(modifyConfirmation.bookingId)} was updated successfully.
               </p>
 
-              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 space-y-1">
+              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-zinc-900 space-y-1">
                 <p>
                   <span className="font-semibold">Vehicle:</span> {modifyConfirmation.vehicleLabel}
                 </p>
