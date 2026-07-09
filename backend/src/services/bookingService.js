@@ -1,6 +1,7 @@
 // --- Notification Scheduling Logic ---
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@example.com";
 const NOTIF_MARKER_PREFIX = "notif_";
+const BOOKING_FRONTEND_BASE_URL_DOCUMENT_TYPE = "booking_frontend_base_url";
 
 async function markNotificationSent(bookingId, type) {
   await prisma.document.create({
@@ -273,6 +274,66 @@ function getFrontendBaseUrl() {
   }
   
   return url.replace(/\/$/, "");
+}
+
+function sanitizeFrontendBaseUrl(value) {
+  if (!value) return null;
+
+  try {
+    const parsed = new URL(String(value).trim());
+    if (!/^https?:$/.test(parsed.protocol)) {
+      return null;
+    }
+    return parsed.origin.replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
+async function recordBookingFrontendBaseUrl(bookingId, frontendBaseUrl) {
+  const sanitizedBaseUrl = sanitizeFrontendBaseUrl(frontendBaseUrl);
+  if (!bookingId || !sanitizedBaseUrl) {
+    return;
+  }
+
+  const existingMarker = await prisma.document.findFirst({
+    where: {
+      bookingId: Number(bookingId),
+      documentType: BOOKING_FRONTEND_BASE_URL_DOCUMENT_TYPE,
+    },
+    select: { id: true },
+  });
+
+  if (existingMarker) {
+    await prisma.document.update({
+      where: { id: existingMarker.id },
+      data: { fileUrl: sanitizedBaseUrl },
+    });
+    return;
+  }
+
+  await prisma.document.create({
+    data: {
+      bookingId: Number(bookingId),
+      documentType: BOOKING_FRONTEND_BASE_URL_DOCUMENT_TYPE,
+      fileUrl: sanitizedBaseUrl,
+    },
+  });
+}
+
+async function getBookingFrontendBaseUrl(bookingId) {
+  if (!bookingId) return null;
+
+  const marker = await prisma.document.findFirst({
+    where: {
+      bookingId: Number(bookingId),
+      documentType: BOOKING_FRONTEND_BASE_URL_DOCUMENT_TYPE,
+    },
+    select: { fileUrl: true },
+    orderBy: { uploadedAt: "desc" },
+  });
+
+  return sanitizeFrontendBaseUrl(marker?.fileUrl);
 }
 
 function formatDateTimeForEmail(value) {
@@ -1047,7 +1108,8 @@ function createGuestManageTokenFromBooking(booking, expiresIn = "7d") {
 
 function buildGuestManageLinks(booking) {
   const token = createGuestManageTokenFromBooking(booking);
-  const baseUrl = getFrontendBaseUrl();
+  const baseUrl =
+    sanitizeFrontendBaseUrl(booking?.frontendBaseUrl) || getFrontendBaseUrl();
   const manageBase = `${baseUrl}/guest-manage/${token}`;
 
   return {
@@ -1462,6 +1524,11 @@ async function createPublicReservationIdentitySession(data = {}) {
     throw buildAppError("Stripe Identity verification could not be started. Please try again.", 502);
   }
 
+  await recordBookingFrontendBaseUrl(
+    booking.id,
+    data.returnUrl ? new URL(String(data.returnUrl), process.env.FRONTEND_URL || "https://fleet-management-bay-ten.vercel.app").origin : null
+  );
+
   await recordBookingSmsConsent(booking, data.customer || {});
 
   return {
@@ -1513,6 +1580,11 @@ async function finalizePublicReservation(bookingId, data = {}) {
       vehicle: true,
     },
   });
+
+  booking.frontendBaseUrl =
+    (await getBookingFrontendBaseUrl(existingBooking.id)) ||
+    sanitizeFrontendBaseUrl(data.frontendBaseUrl) ||
+    booking.frontendBaseUrl;
 
   await syncVehicleStatusOnBookingStatusChange(booking.vehicleId, booking.status);
 
