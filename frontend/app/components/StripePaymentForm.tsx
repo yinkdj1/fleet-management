@@ -143,6 +143,19 @@ export default function StripePaymentForm({
         You will be redirected to Stripe Checkout to securely complete payment.
       </p>
 
+      <button
+        type="button"
+        onClick={() => {
+          startCheckout().catch(() => {
+            // Error state is already surfaced via onError and local error state.
+          });
+        }}
+        disabled={loading || disabled}
+        className="w-full rounded-md bg-emerald-700 px-4 py-2 text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {loading ? "Redirecting..." : "Continue to Stripe Checkout"}
+      </button>
+
       {loading && <p className="text-sm text-blue-600">Redirecting to Stripe Checkout...</p>}
     </div>
   );
