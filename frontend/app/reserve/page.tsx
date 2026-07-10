@@ -1863,7 +1863,7 @@ function ReservePageContent() {
                           event.preventDefault();
                           handleSearchCars();
                         }}
-                        className={`${displayFont.className} touch-manipulation relative z-[120] h-[30px] w-full rounded-lg bg-[linear-gradient(135deg,#2563eb,#0ea5e9)] px-2 py-1 text-[10px] font-semibold tracking-[0.01em] text-white shadow-[0_12px_24px_-12px_rgba(37,99,235,0.8)] transition active:scale-[0.99] hover:-translate-y-0.5 hover:shadow-[0_18px_30px_-14px_rgba(37,99,235,0.85)] md:h-[38px] md:rounded-xl md:px-2.5 md:py-1.5 md:text-sm`}
+                        className={`${displayFont.className} touch-manipulation relative z-[120] h-[30px] w-full rounded-lg bg-[linear-gradient(135deg,#2563eb,#0ea5e9)] px-2 py-1 text-[10px] font-semibold tracking-[0.01em] text-black shadow-[0_12px_24px_-12px_rgba(37,99,235,0.8)] transition active:scale-[0.99] hover:-translate-y-0.5 hover:shadow-[0_18px_30px_-14px_rgba(37,99,235,0.85)] md:h-[38px] md:rounded-xl md:px-2.5 md:py-1.5 md:text-sm md:text-white`}
                       >
                         Search Cars
                       </button>
