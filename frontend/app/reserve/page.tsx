@@ -1856,7 +1856,6 @@ function ReservePageContent() {
                       )}
                     </div>
                     <div className="rounded-lg bg-white/95 backdrop-blur-sm p-1.5 md:rounded-xl md:bg-transparent md:backdrop-blur-none md:p-0">
-                      <label className={`${displayFont.className} mb-0.5 block text-[10px] font-semibold text-zinc-900 md:hidden`}>Search cars</label>
                       <button
                         type="button"
                         onClick={handleSearchCars}
